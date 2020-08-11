@@ -1,0 +1,37 @@
+### BEGIN INIT INFO
+# Provides: growpart
+# Required-Start:
+# Required-Stop:
+# Default-Start: 2
+# Default-Stop:
+# Short-Description: AutoMagically expand the root partition to fill SD card upon 1st boot
+# Description:
+### END INIT INFO
+# Usage:  update-rc.d growpart defaults 2
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+    log_daemon_msg "Starting growpart"
+    if fdisk -l | grep mmcblk >/dev/null; then
+        log_daemon_msg "  growing part /dev/mmcblk0p2"
+        bash growpart /dev/mmcblk0 2
+        sleep 1s
+        log_daemon_msg "  resize2fs /dev/mmcblk0p2"
+        resize2fs /dev/mmcblk0p2
+    else
+        log_daemon_msg "  growing part /dev/sda2"
+        bash growpart /dev/sda 2
+        sleep 1s
+        log_daemon_msg "  resize2fs /dev/sda2"
+        resize2fs /dev/sda2
+    fi
+    update-rc.d growpart remove
+    log_end_msg $?
+    ;;
+  *)
+    echo "Usage: $0 start" >&2
+    exit 3
+    ;;
+esac
