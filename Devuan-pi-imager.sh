@@ -51,25 +51,7 @@ WARN="\033[1;35m"    # hot pink
 BOUL="\033[1;36m"	 # light blue
 NO="\033[0m"         # normal/light
 
-# Check to see if Devuan-pi-imager.sh is being run as root
-start_time=$(date)
-echo -e "${STEP}\n  Checking for root .. ${NO}"
-if [ `id -u` != 0 ]; then
-    echo "nop"
-    echo -e "Ooops, Devuan-pi-imager.sh needs to be run as root !!\n"
-    echo " Try 'sudo sh, ./Devuan-pi-imager.sh' as a user"
-    exit
-else
-    echo -e "${INFO}  Yuppers,${BOUL} root it tis ..${DONE} :)~${NO}"
-fi
-
-if [ ! -e debs/Dependencies-ok ]; then
-  echo -e "${STEP}\n  Installing dependencies ..  ${NO}"
-    apt install dosfstools kpartx libc6-dev parted psmisc xz-utils
-  touch debs/Dependencies-ok
-fi
-
-
+# Define our oops and set trap
 fail () {
     echo -e "${WARN}\n\n  Oh no's,${INFO} Sumfin went wrong\n ${NO}"
     echo -e "${STEP}  Cleaning up my mess .. ${OOPS}:(~ ${NO}"
@@ -89,6 +71,26 @@ fail () {
 
 echo -e "${STEP}  Setting Trap ${NO}"
 trap "echo; echo \"Unmounting /proc\"; fail" SIGINT SIGTERM
+
+
+# Check to see if Devuan-pi-imager.sh is being run as root
+start_time=$(date)
+echo -e "${STEP}\n  Checking for root .. ${NO}"
+if [ `id -u` != 0 ]; then
+    echo "nop"
+    echo -e "Ooops, Devuan-pi-imager.sh needs to be run as root !!\n"
+    echo " Try 'sudo sh, ./Devuan-pi-imager.sh' as a user"
+    exit
+else
+    echo -e "${INFO}  Yuppers,${BOUL} root it tis ..${DONE} :)~${NO}"
+fi
+
+if [ ! -e debs/Dependencies-ok ]; then
+  echo -e "${STEP}\n  Installing dependencies ..  ${NO}"
+    apt install dosfstools kpartx libc6-dev parted psmisc xz-utils || fail
+  touch debs/Dependencies-ok
+fi
+
 
 echo -e "${INFO}  Making sure of a kleen enviroment .. ${BOUL}:/~ ${NO}"
 umount sdcard/proc
@@ -341,6 +343,11 @@ chroot sdcard apt update
 echo -e "${STEP}     apt upgrade  ${NO}"
 chroot sdcard apt-get upgrade -y
 
+echo -e "${STEP}\n\n  Install some firmware ${NO}"
+chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
+	firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek
+
+
 #	###########  Install kernel  ######################################################
 
 echo -e "${DONE}\n    Install kernel   ${NO}"
@@ -441,7 +448,7 @@ grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
 
 
-EXTRAS="dhcpcd5 fake-hwclock ntp mlocate parted psmisc wpasupplicant"
+EXTRAS="dhcpcd5 git ntp mlocate parted psmisc wpasupplicant"
 echo -e "${STEP}\n  Install ${DONE}${EXTRAS}\n ${NO}"
 chroot sdcard apt-get install -y ${EXTRAS} || fail
 
@@ -538,6 +545,8 @@ install -v -m 0644 growpart.init sdcard/root/Devuan-imager
 install -v -m 0755 growpart sdcard/usr/bin/growpart
 install -v -m 0755 growpart.init sdcard/etc/init.d/growpart
 chroot sdcard update-rc.d growpart defaults 2
+cp -aR .git sdcard/root/Devuan-imager/.git
+ls .git sdcard/root/Devuan-imager/.git
 
 sync
 echo -e "${STEP}\n  Total sdcard used ${NO}"; echo
