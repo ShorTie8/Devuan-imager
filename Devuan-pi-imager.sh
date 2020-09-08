@@ -111,7 +111,7 @@ if [ ! -f Image ]; then
   if [ "$my_DESKTOP" = "yes" ]; then
     dd if=/dev/zero of=Image  bs=1M  count=3866 iflag=fullblock
   else
-    dd if=/dev/zero of=Image  bs=1M  count=1420 iflag=fullblock
+    dd if=/dev/zero of=Image  bs=1M  count=1840 iflag=fullblock
   fi
 fi
 
