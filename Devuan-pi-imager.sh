@@ -87,7 +87,7 @@ fi
 
 if [ ! -e debs/Dependencies-ok ]; then
   echo -e "${STEP}\n  Installing dependencies ..  ${NO}"
-    apt install dosfstools kpartx libc6-dev parted psmisc xz-utils || fail
+    apt install dosfstools file kpartx libc6-dev parted psmisc xz-utils || fail
   touch debs/Dependencies-ok
 fi
 
@@ -108,7 +108,11 @@ rm -rvf sdcard
 
 if [ ! -f Image ]; then
   echo -e "${DONE}\n\n  Creating a zero-filled file ${NO}"
-  dd if=/dev/zero of=Image  bs=1M  count=3866 iflag=fullblock
+  if [ "$my_DESKTOP" = "yes" ]; then
+    dd if=/dev/zero of=Image  bs=1M  count=3866 iflag=fullblock
+  else
+    dd if=/dev/zero of=Image  bs=1M  count=1420 iflag=fullblock
+  fi
 fi
 
 # Create partitions
@@ -177,11 +181,12 @@ fi
 
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
 include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
+exclude="--exclude="
 
 echo -e "${STEP}\n  debootstrap's line is ${NO}"
-debootstrapline=" --arch ${ARCH} ${include} ${release} sdcard"
+debootstrapline=" --arch ${ARCH} ${include} ${exclude} ${release} sdcard"
 echo ${debootstrapline}; echo
-DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${release} sdcard || fail
+DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${release} sdcard || fail
 
 echo -e "${STEP}\n  Mount new chroot system\n ${NO}"
 mount -v -t vfat -o sync $bootpart sdcard/boot
@@ -544,6 +549,7 @@ install -v -m 0644 growpart sdcard/root/Devuan-imager
 install -v -m 0644 growpart.init sdcard/root/Devuan-imager
 install -v -m 0755 growpart sdcard/usr/bin/growpart
 install -v -m 0755 growpart.init sdcard/etc/init.d/growpart
+install -v -m 0644 READme sdcard/root/Devuan-imager
 chroot sdcard update-rc.d growpart defaults 2
 cp -aR .git sdcard/root/Devuan-imager/.git
 ls .git sdcard/root/Devuan-imager/.git
