@@ -181,7 +181,8 @@ fi
 
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
 include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
-exclude="--exclude="
+exclude=
+#exclude="--exclude="
 
 echo -e "${STEP}\n  debootstrap's line is ${NO}"
 debootstrapline=" --arch ${ARCH} ${include} ${exclude} ${release} sdcard"
