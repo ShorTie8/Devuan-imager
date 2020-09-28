@@ -299,7 +299,7 @@ ff02::2		ip6-allrouters
 EOF
 
 echo -e "${STEP}\n  Create sdcard/etc/network/interfaces ${NO}"
-cat <<EOF > sdcard/etc/network/interfaces
+tee sdcard/etc/network/interfaces <<EOF
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
 
