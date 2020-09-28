@@ -164,17 +164,20 @@ echo -e "${STEP}\n  Setting up for debootstrap ${NO}"
 mkdir -v sdcard
 mount -v -t ext4 -o sync $rootpart sdcard
 
-echo -e "${STEP}\n  Copying debs ${NO}"
 if [ ! -d debs/${ARCH}/${release} ]; then
   echo -e "${STEP}\n  Making debs directory ${NO}"
   mkdir -vp debs/${ARCH}/${release}
 fi
-du -sh debs/${ARCH}/${release}
-mkdir -vp sdcard/var/cache/apt/archives
-cp debs/${ARCH}/${release}/*.deb sdcard/var/cache/apt/archives
+
+if [ -f debs/${ARCH}/${release}/eudev*.deb ]; then
+  echo -e "${STEP}\n  Copying debs ${NO}"
+  du -sh debs/${ARCH}/${release}
+  mkdir -vp sdcard/var/cache/apt/archives
+  cp debs/${ARCH}/${release}/*.deb sdcard/var/cache/apt/archives
+fi
 
 if [ ! -d debs/debootstrap ]; then
-    wget -nc -P debs https://pkgmaster.devuan.org/devuan/pool/main/d/debootstrap/${DebootStrap}
+    wget -P debs https://pkgmaster.devuan.org/devuan/pool/main/d/debootstrap/${DebootStrap} || fail
     mkdir -vp debs/debootstrap
     tar xf debs/${DebootStrap} -C debs/debootstrap
 fi
@@ -182,7 +185,7 @@ fi
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
 include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
 exclude=
-#exclude="--exclude="
+#exclude="--exclude= "
 
 echo -e "${STEP}\n  debootstrap's line is ${NO}"
 debootstrapline=" --arch ${ARCH} ${include} ${exclude} ${release} sdcard"
@@ -295,6 +298,22 @@ ff02::2		ip6-allrouters
 
 EOF
 
+echo -e "${STEP}\n  Create sdcard/etc/network/interfaces ${NO}"
+cat <<EOF > sdcard/etc/network/interfaces
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+allow-hotplug eth0
+iface eth0 inet dhcp
+
+EOF
+
+
 echo -e "${STEP}\n  hostname ${NO}"; cat sdcard/etc/hostname
 echo -e "${STEP}\n  resolv.conf ${NO}"; cat sdcard/etc/resolv.conf
 echo -e "${STEP}\n  hosts ${NO}"; cat sdcard/etc/hosts
@@ -325,12 +344,12 @@ echo -e "${DONE}\n  Done Coping, adjusting and reconfiguring ${NO}"
 
 echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
 echo -e "${STEP}  apt install -y gnupg wget ${NO}"
-chroot sdcard apt-get install -y gnupg wget
+chroot sdcard apt-get install -y gnupg wget || fail
 
 echo -e "${STEP}\n  Add archive.raspberrypi gpg.key ${NO}"
 
 if [ ! -d debs/raspberrypi.gpg.key ]; then
-    wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key
+    wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
 fi
 cp -v debs/raspberrypi.gpg.key sdcard
 chroot sdcard apt-key add raspberrypi.gpg.key
@@ -344,20 +363,20 @@ deb http://archive.raspberrypi.org/debian/ buster main
 EOF
 
 echo -e "${STEP}     apt update  ${NO}"
-chroot sdcard apt update
+chroot sdcard apt update || fail
 
 echo -e "${STEP}     apt upgrade  ${NO}"
-chroot sdcard apt-get upgrade -y
+chroot sdcard apt-get upgrade -y || fail
 
 echo -e "${STEP}\n\n  Install some firmware ${NO}"
 chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
-	firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek
+	firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek || fail
 
 
 #	###########  Install kernel  ######################################################
 
 echo -e "${DONE}\n    Install kernel   ${NO}"
-chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel
+chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
 
 KERNEL=$(ls sdcard/lib/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
 
@@ -384,30 +403,43 @@ fi
 
 echo -e "${STEP}\n  Creating cmdline.txt ${NO}"
 tee sdcard/boot/cmdline.txt <<EOF
-console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
 EOF
 
 echo -e "${STEP}\n  Copy config.txt ${NO}"
 if [ ! -f debs/config.armhf ]; then
     echo; echo; echo "downloading"; echo
-    wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt
+    wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt -O debs/config.armhf || fail
+fi
+if [ ! -f debs/config.arm64 ]; then
+    echo; echo; echo "downloading"; echo
+    wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt || fail
     cp -v config.txt debs/config.armhf
-    sed '4 i dtparam=random=on' config.txt > config.txt.new
-    sed '4 i arm_64bit=1' config.txt.new > config.txt.new.1
-    sed '/Some settings/G' config.txt.new.1 > debs/config.arm64
-    rm -v config.txt config.txt.new config.txt.new.1
+    sed '4 i #dtoverlay=sdtweak,poll_once=on' config.txt > config.txt.new
+    sed '4 i dtoverlay=i2c-rtc,ds3231' config.txt.new > config.txt.new.2
+    sed '4 i dtparam=random=on' config.txt.new.2 > config.txt.new.3
+    sed '4 i arm_64bit=1' config.txt.new.3 > config.txt.new.4
+    sed '/Some settings/G' config.txt.new.4 > debs/config.arm64
+    rm -v config.txt config.txt.new config.txt.new.*
+    sed -i 's/#hdmi_group=1/hdmi_group=1/' debs/config.arm64
+    sed -i 's/#hdmi_mode=1/hdmi_mode=4/' debs/config.arm64
+    sed -i 's/#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' debs/config.arm64
 fi
 cp -v debs/config.${ARCH} sdcard/boot/config.txt
+
+echo -e "${STEP}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
+echo "i2c-dev" >> sdcard/etc/modules
+cat sdcard/etc/modules
 
 echo -e "${STEP}\n  Adding wifi firmware ${NO}"
 if [ ! -f debs/brcmfmac.tar.xz ]; then
     echo; echo; echo "downloading"; echo
     mkdir -vp sdcard/lib/firmware/brcm
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43430-sdio.bin
-    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43430-sdio.txt
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.bin
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.clm_blob
-    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43455-sdio.txt
+    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43430-sdio.bin || fail
+    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43430-sdio.txt || fail
+    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.bin || fail
+    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.clm_blob || fail
+    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43455-sdio.txt || fail
     tar -cJf debs/brcmfmac.tar.xz sdcard/lib/firmware/brcm/*
 fi
 tar xvf debs/brcmfmac.tar.xz
@@ -431,13 +463,13 @@ echo "vm.dirty_background_ratio = 10" >> sdcard/etc/sysctl.conf
 
 
 echo -e "${STEP}\n  apt install -y libraspberrypi-bin ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-bin
+chroot sdcard apt-get install -y libraspberrypi-bin || fail
 
 echo -e "${STEP}\n  apt install -y libraspberrypi-dev ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-dev
+chroot sdcard apt-get install -y libraspberrypi-dev || fail
 
 echo -e "${STEP}\n  apt install -y libraspberrypi-doc ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-doc
+chroot sdcard apt-get install -y libraspberrypi-doc || fail
 
 
 #	###########  ssh, root passwd && extra's  ################
@@ -453,8 +485,8 @@ sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/s
 grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
 
-
-EXTRAS="dhcpcd5 git ntp mlocate parted psmisc wpasupplicant"
+#dhcpcd5 ntp  wpasupplicant
+EXTRAS="git mlocate parted psmisc sysv-rc-conf"
 echo -e "${STEP}\n  Install ${DONE}${EXTRAS}\n ${NO}"
 chroot sdcard apt-get install -y ${EXTRAS} || fail
 
@@ -462,7 +494,7 @@ chroot sdcard apt-get install -y ${EXTRAS} || fail
 
 echo -e "${DONE}\n  Setup user pi  ${NO}"
 echo -e "${STEP}\n    apt install -y sudo ${NO}"
-chroot sdcard apt-get install -y sudo
+chroot sdcard apt-get install -y sudo || fail
 echo
 chroot sdcard adduser pi --gecos "${hostname}" --disabled-password
 echo pi:toor | chroot sdcard chpasswd
