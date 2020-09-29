@@ -416,7 +416,8 @@ if [ ! -f debs/config.arm64 ]; then
     wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt || fail
     cp -v config.txt debs/config.armhf
     sed '4 i #dtoverlay=sdtweak,poll_once=on' config.txt > config.txt.new
-    sed '4 i dtoverlay=i2c-rtc,ds3231' config.txt.new > config.txt.new.2
+    sed '4 i #dtoverlay=i2c-rtc,ds3231' config.txt.new > config.txt.new.1
+    sed '4 i dtoverlay=i2c-rtc,ds1307' config.txt.new.1 > config.txt.new.2
     sed '4 i dtparam=random=on' config.txt.new.2 > config.txt.new.3
     sed '4 i arm_64bit=1' config.txt.new.3 > config.txt.new.4
     sed '/Some settings/G' config.txt.new.4 > debs/config.arm64
@@ -430,6 +431,14 @@ cp -v debs/config.${ARCH} sdcard/boot/config.txt
 echo -e "${STEP}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
 echo "i2c-dev" >> sdcard/etc/modules
 cat sdcard/etc/modules
+
+echo -e "${STEP}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
+sed -i 's/exit 0/echo ds1307 0x68 > \/sys\/class\/i2c-adapter\/i2c-1\/new_device/' sdcard/etc/rc.local
+echo "hwclock -s" >> sdcard/etc/rc.local
+echo "" >> sdcard/etc/rc.local
+echo "exit 0" >> sdcard/etc/rc.local
+echo "" >> sdcard/etc/rc.local
+cat sdcard/etc/rc.local
 
 echo -e "${STEP}\n  Adding wifi firmware ${NO}"
 if [ ! -f debs/brcmfmac.tar.xz ]; then
@@ -485,8 +494,8 @@ sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/s
 grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
 
-#dhcpcd5 ntp  wpasupplicant
-EXTRAS="git mlocate parted psmisc sysv-rc-conf"
+#dhcpcd5  wpasupplicant
+EXTRAS="git mlocate ntp parted psmisc sysv-rc-conf"
 echo -e "${STEP}\n  Install ${DONE}${EXTRAS}\n ${NO}"
 chroot sdcard apt-get install -y ${EXTRAS} || fail
 
