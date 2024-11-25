@@ -7,25 +7,27 @@
 set +h
 
 DATE=$(date +"%Y%m%d")
+ReLease=daedalus
+
 #my_DESKTOP=yes
 
 if [ "$1" = "armhf" ]; then
     echo "32 bit"
     ARCH=armhf
-    release=beowulf
-    Image_Name=Devuan-pi-${release}.${DATE}.img
-    echo ${Image_Name}
 else
     echo "64 bit"
-    ARCH=arm64
-    release=beowulf
-    #release=chimaera
-    Image_Name=Devuan-p4-64-${release}.${DATE}.img
-    echo ${Image_Name}
+    if [ "$1" = "amd64" ]; then
+		ARCH=amd64
+    else
+		ARCH=arm64
+    fi
 fi
+Image_Name=Devuan-${DATE}-${ReLease}.${DATE}.img
+echo ${Image_Name}
+
 
 # From  http://deb.devuan.org/devuan/pool/main/d/debootstrap
-DebootStrap=debootstrap_1.0.123+devuan2.tar.gz
+DeBootStrap=debootstrap_1.0.137devuan1.tar.gz
 
 hostname=Devuan
 root_password=toor 	# Re-Define your own root password here
@@ -160,37 +162,51 @@ P2_UUID="$(lsblk -o PTUUID "${loop_device}" | sed -n 2p)-02"
 echo "P1_UUID = ${P1_UUID}"
 echo "P2_UUID = ${P2_UUID}"
 
-echo -e "${STEP}\n  Setting up for debootstrap ${NO}"
+echo -e "${STEP}\n  Setting up for DeBootStrap ${NO}"
 mkdir -v sdcard
 mount -v -t ext4 -o sync $rootpart sdcard
 
-if [ ! -d debs/${ARCH}/${release} ]; then
+if [ ! -d debs/${ARCH}/${ReLease} ]; then
   echo -e "${STEP}\n  Making debs directory ${NO}"
-  mkdir -vp debs/${ARCH}/${release}
+  mkdir -vp debs/${ARCH}/${ReLease}
 fi
 
-if [ -f debs/${ARCH}/${release}/eudev*.deb ]; then
+if [ -f debs/${ARCH}/${ReLease}/eudev*.deb ]; then
   echo -e "${STEP}\n  Copying debs ${NO}"
-  du -sh debs/${ARCH}/${release}
+  du -sh debs/${ARCH}/${ReLease}
   mkdir -vp sdcard/var/cache/apt/archives
-  cp debs/${ARCH}/${release}/*.deb sdcard/var/cache/apt/archives
+  cp -v debs/${ARCH}/${ReLease}/*.deb sdcard/var/cache/apt/archives
 fi
 
 if [ ! -d debs/debootstrap ]; then
-    wget -P debs https://pkgmaster.devuan.org/devuan/pool/main/d/debootstrap/${DebootStrap} || fail
+    wget -P debs https://pkgmaster.devuan.org/devuan/pool/main/d/debootstrap/${DeBootStrap} || fail
     mkdir -vp debs/debootstrap
-    tar xf debs/${DebootStrap} -C debs/debootstrap
+    tar xf debs/${DeBootStrap} -C debs/debootstrap
 fi
 
+
+##	devuan_keyring
+if [ ! -f "/usr/share/keyrings/devuan-keyring.gpg" ]; then
+	echo -e "${STEP} Installing Devuan keyring"
+	URL="https://pkgmaster.devuan.org/devuan/pool/main/d/devuan-keyring/"
+	FILE="devuan-keyring_2023.10.07_all.deb"
+	wget -nc --show-progress ${URL}${FILE}
+	dpkg -i ${FILE}
+	rm -v ${FILE}
+else
+	echo -e "${INFO} Already have Devuan keyring${NO}"
+fi
+
+##	
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
 include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
 exclude=
 #exclude="--exclude= "
 
-echo -e "${STEP}\n  debootstrap's line is ${NO}"
-debootstrapline=" --arch ${ARCH} ${include} ${exclude} ${release} sdcard"
-echo ${debootstrapline}; echo
-DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${release} sdcard || fail
+echo -e "${STEP}\n  DeBootStrap's line is ${NO}"
+DeBootStrapline=" --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard"
+echo ${DeBootStrapline}; echo
+DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard || fail
 
 echo -e "${STEP}\n  Mount new chroot system\n ${NO}"
 mount -v -t vfat -o sync $bootpart sdcard/boot
@@ -210,8 +226,8 @@ echo -e "${INFO}\n\n  Copy, adjust and reconfigure ${NO}"
 echo -e "${STEP}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
 cat sdcard/etc/apt/sources.list
   sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
-#  echo "deb http://deb.devuan.org/merged ${release} main contrib non-free" >> sdcard/etc/apt/sources.list
-#echo "deb http://deb.devuan.org/merged ${release} main contrib non-free" > sdcard/etc/apt/sources.list
+#  echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" >> sdcard/etc/apt/sources.list
+#echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" > sdcard/etc/apt/sources.list
 cat sdcard/etc/apt/sources.list
 
 echo -e "${STEP}\n  Install ${DONE}locales-all\n ${NO}"
@@ -489,7 +505,7 @@ chroot sdcard apt-get install -y ssh --no-install-recommends || fail
 echo -e "${STEP}\n  Setting up the root password... ${NO} $root_password "
 echo root:$root_password | chroot sdcard chpasswd
 
-echo -e "${STEP}\n  Allowing root to log into $release with password...  ${NO}"
+echo -e "${STEP}\n  Allowing root to log into $ReLease with password...  ${NO}"
 sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/ssh/sshd_config
 grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
@@ -579,7 +595,7 @@ fi
 #	########### Final setup		###########
 
 echo -e "${STEP}\n  sync'n debs ${NO}"
-cp -nv sdcard/var/cache/apt/archives/*.deb debs/${ARCH}/${release}
+cp -nv sdcard/var/cache/apt/archives/*.deb debs/${ARCH}/${ReLease}
 
 echo -e "${STEP}\n  Cleaning out archives   ${NO}"
 du -h sdcard/var/cache/apt/archives | tail -1
