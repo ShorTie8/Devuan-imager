@@ -223,7 +223,7 @@ mount -v --bind /dev/pts sdcard/dev/pts
 # Adjust a few things
 echo -e "${INFO}\n\n  Copy, adjust and reconfigure ${NO}"
 
-echo -e "${STEP}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
+echo -e "${WARN}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
 cat sdcard/etc/apt/sources.list
   sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
 #  echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" >> sdcard/etc/apt/sources.list
@@ -355,147 +355,152 @@ echo "CONF_SWAPSIZE=100" > sdcard/etc/dphys-swapfile
 echo -e "${DONE}\n  Done Coping, adjusting and reconfiguring ${NO}"
 #	###########  Done with basic system  ################
 
+##	#######################################################################################################################
+##	###########  pi Stuff  ################################################################################################
+##	#######################################################################################################################
+if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
+	#	###########  Install raspberrypi.gpg.key  ################
 
-#	###########  Install raspberrypi.gpg.key  ################
+	echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
+	echo -e "${STEP}  apt install -y gnupg wget ${NO}"
+	chroot sdcard apt-get install -y gnupg wget || fail
 
-echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
-echo -e "${STEP}  apt install -y gnupg wget ${NO}"
-chroot sdcard apt-get install -y gnupg wget || fail
+	echo -e "${STEP}\n  Add archive.raspberrypi gpg.key ${NO}"
 
-echo -e "${STEP}\n  Add archive.raspberrypi gpg.key ${NO}"
+	if [ ! -d debs/raspberrypi.gpg.key ]; then
+		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
+	fi
+	cp -v debs/raspberrypi.gpg.key sdcard
+	chroot sdcard apt-key add raspberrypi.gpg.key
+	rm -v sdcard/raspberrypi.gpg.key
 
-if [ ! -d debs/raspberrypi.gpg.key ]; then
-    wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
-fi
-cp -v debs/raspberrypi.gpg.key sdcard
-chroot sdcard apt-key add raspberrypi.gpg.key
-rm -v sdcard/raspberrypi.gpg.key
+	echo -e "${STEP}\n  Creating raspi.list ${NO}"
+	tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
 
-echo -e "${STEP}\n  Creating raspi.list ${NO}"
-tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
 deb http://archive.raspberrypi.org/debian/ buster main
 # Uncomment line below then 'apt-get update' to enable 'apt-get source'
 #deb-src http://archive.raspberrypi.org/debian/ buster main
 EOF
 
-echo -e "${STEP}     apt update  ${NO}"
-chroot sdcard apt update || fail
+	echo -e "${STEP}     apt update  ${NO}"
+	chroot sdcard apt update || fail
 
-echo -e "${STEP}     apt upgrade  ${NO}"
-chroot sdcard apt-get upgrade -y || fail
+	echo -e "${STEP}     apt upgrade  ${NO}"
+	chroot sdcard apt-get upgrade -y || fail
 
-echo -e "${STEP}\n\n  Install some firmware ${NO}"
-chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
-	firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek || fail
+	echo -e "${STEP}\n\n  Install some firmware ${NO}"
+	chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
+		firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek || fail
 
 
-#	###########  Install kernel  ######################################################
+	##	###########  Install Kernel  ##########################################################################################
 
-echo -e "${DONE}\n    Install kernel   ${NO}"
-chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
+	echo -e "${WARN}\n    Install kernel   ${NO}"
 
-KERNEL=$(ls sdcard/lib/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
+	chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
 
-echo -e "${STEP}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
-if [ "${ARCH}" == "arm64" ]; then
-    rm -v sdcard/boot/{bootcode.bin,fixup.dat,fixup_x.dat,fixup_cd.dat,fixup_db.dat}
-    rm -v sdcard/boot/{start.elf,start_x.elf,start_cd.elf,start_db.elf}
-    rm -v sdcard/boot/{kernel.img,kernel7.img,kernel7l.img}
-    rm -v sdcard/boot/{bcm2708-rpi-cm.dtb,bcm2708-rpi-b.dtb,bcm2708-rpi-b-rev1.dtb,bcm2708-rpi-b-plus.dtb}
-    rm -v sdcard/boot/{bcm2708-rpi-zero.dtb,bcm2708-rpi-zero-w.dtb,bcm2709-rpi-2-b.dtb}
-    rm -v sdcard/boot/{bcm2710-rpi-2-b.dtb,bcm2710-rpi-cm3.dtb,bcm2710-rpi-3-b.dtb,bcm2710-rpi-3-b-plus.dtb}
-    ls sdcard/lib/modules
-    rm -rf sdcard/lib/modules/{${KERNEL}+,${KERNEL}-v7+,${KERNEL}-v7l+}
-    ls sdcard/lib/modules
-else
- #   rm -v sdcard/boot/{fixup4.dat,fixup4x.dat,fixup4cd.dat,fixup4db.dat}
- #   rm -v sdcard/boot/{start4.elf,start4x.elf,start4cd.elf,start4db.elf}
-    rm -v sdcard/boot/kernel8.img
- #   rm -v sdcard/boot/bcm2711-rpi-4-b.dtb
-    ls sdcard/lib/modules
-    rm -rf sdcard/lib/modules/${KERNEL}-v8+
-    ls sdcard/lib/modules
-fi
+	KERNEL=$(ls sdcard/lib/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
 
-echo -e "${STEP}\n  Creating cmdline.txt ${NO}"
-tee sdcard/boot/cmdline.txt <<EOF
+	echo -e "${STEP}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
+	if [ "${ARCH}" == "arm64" ]; then
+		rm -v sdcard/boot/{bootcode.bin,fixup.dat,fixup_x.dat,fixup_cd.dat,fixup_db.dat}
+		rm -v sdcard/boot/{start.elf,start_x.elf,start_cd.elf,start_db.elf}
+		rm -v sdcard/boot/{kernel.img,kernel7.img,kernel7l.img}
+		rm -v sdcard/boot/{bcm2708-rpi-cm.dtb,bcm2708-rpi-b.dtb,bcm2708-rpi-b-rev1.dtb,bcm2708-rpi-b-plus.dtb}
+		rm -v sdcard/boot/{bcm2708-rpi-zero.dtb,bcm2708-rpi-zero-w.dtb,bcm2709-rpi-2-b.dtb}
+		rm -v sdcard/boot/{bcm2710-rpi-2-b.dtb,bcm2710-rpi-cm3.dtb,bcm2710-rpi-3-b.dtb,bcm2710-rpi-3-b-plus.dtb}
+		ls sdcard/lib/modules
+		rm -rf sdcard/lib/modules/{${KERNEL}+,${KERNEL}-v7+,${KERNEL}-v7l+}
+		ls sdcard/lib/modules
+	else
+	#   rm -v sdcard/boot/{fixup4.dat,fixup4x.dat,fixup4cd.dat,fixup4db.dat}
+	#   rm -v sdcard/boot/{start4.elf,start4x.elf,start4cd.elf,start4db.elf}
+		rm -v sdcard/boot/kernel8.img
+	#   rm -v sdcard/boot/bcm2711-rpi-4-b.dtb
+		ls sdcard/lib/modules
+		rm -rf sdcard/lib/modules/${KERNEL}-v8+
+		ls sdcard/lib/modules
+	fi
+
+	echo -e "${STEP}\n  Creating cmdline.txt ${NO}"
+	tee sdcard/boot/cmdline.txt <<EOF
 console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
 EOF
 
-echo -e "${STEP}\n  Copy config.txt ${NO}"
-if [ ! -f debs/config.armhf ]; then
-    echo; echo; echo "downloading"; echo
-    wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt -O debs/config.armhf || fail
+	echo -e "${STEP}\n  Copy config.txt ${NO}"
+	if [ ! -f debs/config.armhf ]; then
+		echo; echo; echo "downloading"; echo
+		wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt -O debs/config.armhf || fail
+	fi
+	if [ ! -f debs/config.arm64 ]; then
+		echo; echo; echo "downloading"; echo
+		wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt || fail
+		cp -v config.txt debs/config.armhf
+		sed '4 i #dtoverlay=sdtweak,poll_once=on' config.txt > config.txt.new
+		sed '4 i #dtoverlay=i2c-rtc,ds3231' config.txt.new > config.txt.new.1
+		sed '4 i dtoverlay=i2c-rtc,ds1307' config.txt.new.1 > config.txt.new.2
+		sed '4 i dtparam=random=on' config.txt.new.2 > config.txt.new.3
+		sed '4 i arm_64bit=1' config.txt.new.3 > config.txt.new.4
+		sed '/Some settings/G' config.txt.new.4 > debs/config.arm64
+		rm -v config.txt config.txt.new config.txt.new.*
+		sed -i 's/#hdmi_group=1/hdmi_group=1/' debs/config.arm64
+		sed -i 's/#hdmi_mode=1/hdmi_mode=4/' debs/config.arm64
+		sed -i 's/#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' debs/config.arm64
+	fi
+	cp -v debs/config.${ARCH} sdcard/boot/config.txt
+
+	echo -e "${STEP}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
+	echo "i2c-dev" >> sdcard/etc/modules
+	cat sdcard/etc/modules
+
+	echo -e "${STEP}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
+	sed -i 's/exit 0/echo ds1307 0x68 > \/sys\/class\/i2c-adapter\/i2c-1\/new_device/' sdcard/etc/rc.local
+	echo "hwclock -s" >> sdcard/etc/rc.local
+	echo "" >> sdcard/etc/rc.local
+	echo "exit 0" >> sdcard/etc/rc.local
+	echo "" >> sdcard/etc/rc.local
+	cat sdcard/etc/rc.local
+
+	echo -e "${STEP}\n  Adding wifi firmware ${NO}"
+	if [ ! -f debs/brcmfmac.tar.xz ]; then
+		echo; echo; echo "downloading"; echo
+		mkdir -vp sdcard/lib/firmware/brcm
+		wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43430-sdio.bin || fail
+		wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43430-sdio.txt || fail
+		wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.bin || fail
+		wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.clm_blob || fail
+		wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43455-sdio.txt || fail
+		tar -cJf debs/brcmfmac.tar.xz sdcard/lib/firmware/brcm/*
+	fi
+	tar xvf debs/brcmfmac.tar.xz
+
+	echo -e "${STEP}\n  Adding Raspberry Pi tweaks to sysctl.conf ${NO}"
+	echo "" >> sdcard/etc/sysctl.conf
+	echo "# http://www.raspberrypi.org/forums/viewtopic.php?p=104096" >> sdcard/etc/sysctl.conf
+	echo "# rpi tweaks" >> sdcard/etc/sysctl.conf
+	echo "vm.swappiness = 1" >> sdcard/etc/sysctl.conf
+	echo "vm.min_free_kbytes = 8192" >> sdcard/etc/sysctl.conf
+	echo "vm.vfs_cache_pressure = 50" >> sdcard/etc/sysctl.conf
+	echo "vm.dirty_writeback_centisecs = 1500" >> sdcard/etc/sysctl.conf
+	echo "vm.dirty_ratio = 20" >> sdcard/etc/sysctl.conf
+	echo "vm.dirty_background_ratio = 10" >> sdcard/etc/sysctl.conf
+
+	# https://haydenjames.io/raspberry-pi-performance-add-zram-kernel-parameters/
+	#vm.vfs_cache_pressure=500
+	#vm.swappiness=100
+	#vm.dirty_background_ratio=1
+	#vm.dirty_ratio=50
+
+
+	echo -e "${STEP}\n  apt install -y libraspberrypi-bin ${NO}"
+	chroot sdcard apt-get install -y libraspberrypi-bin || fail
+
+	echo -e "${STEP}\n  apt install -y libraspberrypi-dev ${NO}"
+	chroot sdcard apt-get install -y libraspberrypi-dev || fail
+
+	echo -e "${STEP}\n  apt install -y libraspberrypi-doc ${NO}"
+	chroot sdcard apt-get install -y libraspberrypi-doc || fail
 fi
-if [ ! -f debs/config.arm64 ]; then
-    echo; echo; echo "downloading"; echo
-    wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt || fail
-    cp -v config.txt debs/config.armhf
-    sed '4 i #dtoverlay=sdtweak,poll_once=on' config.txt > config.txt.new
-    sed '4 i #dtoverlay=i2c-rtc,ds3231' config.txt.new > config.txt.new.1
-    sed '4 i dtoverlay=i2c-rtc,ds1307' config.txt.new.1 > config.txt.new.2
-    sed '4 i dtparam=random=on' config.txt.new.2 > config.txt.new.3
-    sed '4 i arm_64bit=1' config.txt.new.3 > config.txt.new.4
-    sed '/Some settings/G' config.txt.new.4 > debs/config.arm64
-    rm -v config.txt config.txt.new config.txt.new.*
-    sed -i 's/#hdmi_group=1/hdmi_group=1/' debs/config.arm64
-    sed -i 's/#hdmi_mode=1/hdmi_mode=4/' debs/config.arm64
-    sed -i 's/#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' debs/config.arm64
-fi
-cp -v debs/config.${ARCH} sdcard/boot/config.txt
-
-echo -e "${STEP}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
-echo "i2c-dev" >> sdcard/etc/modules
-cat sdcard/etc/modules
-
-echo -e "${STEP}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
-sed -i 's/exit 0/echo ds1307 0x68 > \/sys\/class\/i2c-adapter\/i2c-1\/new_device/' sdcard/etc/rc.local
-echo "hwclock -s" >> sdcard/etc/rc.local
-echo "" >> sdcard/etc/rc.local
-echo "exit 0" >> sdcard/etc/rc.local
-echo "" >> sdcard/etc/rc.local
-cat sdcard/etc/rc.local
-
-echo -e "${STEP}\n  Adding wifi firmware ${NO}"
-if [ ! -f debs/brcmfmac.tar.xz ]; then
-    echo; echo; echo "downloading"; echo
-    mkdir -vp sdcard/lib/firmware/brcm
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43430-sdio.bin || fail
-    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43430-sdio.txt || fail
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.bin || fail
-    wget -nc -P sdcard/lib/firmware/brcm https://github.com/RPi-Distro/firmware-nonfree/raw/master/brcm/brcmfmac43455-sdio.clm_blob || fail
-    wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43455-sdio.txt || fail
-    tar -cJf debs/brcmfmac.tar.xz sdcard/lib/firmware/brcm/*
-fi
-tar xvf debs/brcmfmac.tar.xz
-
-echo -e "${STEP}\n  Adding Raspberry Pi tweaks to sysctl.conf ${NO}"
-echo "" >> sdcard/etc/sysctl.conf
-echo "# http://www.raspberrypi.org/forums/viewtopic.php?p=104096" >> sdcard/etc/sysctl.conf
-echo "# rpi tweaks" >> sdcard/etc/sysctl.conf
-echo "vm.swappiness = 1" >> sdcard/etc/sysctl.conf
-echo "vm.min_free_kbytes = 8192" >> sdcard/etc/sysctl.conf
-echo "vm.vfs_cache_pressure = 50" >> sdcard/etc/sysctl.conf
-echo "vm.dirty_writeback_centisecs = 1500" >> sdcard/etc/sysctl.conf
-echo "vm.dirty_ratio = 20" >> sdcard/etc/sysctl.conf
-echo "vm.dirty_background_ratio = 10" >> sdcard/etc/sysctl.conf
-
-# https://haydenjames.io/raspberry-pi-performance-add-zram-kernel-parameters/
-#vm.vfs_cache_pressure=500
-#vm.swappiness=100
-#vm.dirty_background_ratio=1
-#vm.dirty_ratio=50
-
-
-echo -e "${STEP}\n  apt install -y libraspberrypi-bin ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-bin || fail
-
-echo -e "${STEP}\n  apt install -y libraspberrypi-dev ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-dev || fail
-
-echo -e "${STEP}\n  apt install -y libraspberrypi-doc ${NO}"
-chroot sdcard apt-get install -y libraspberrypi-doc || fail
-
 
 #	###########  ssh, root passwd && extra's  ################
 
