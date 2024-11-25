@@ -56,7 +56,7 @@ NO="\033[0m"         # normal/light
 # Define our oops and set trap
 fail () {
     echo -e "${WARN}\n\n  Oh no's,${INFO} Sumfin went wrong\n ${NO}"
-    echo -e "${STEP}  Cleaning up my mess .. ${OOPS}:(~ ${NO}"
+    echo -e "${DONE}  Cleaning up my mess .. ${OOPS}:(~ ${NO}"
     umount sdcard/proc
     umount sdcard/sys
     umount sdcard/dev/pts
@@ -71,13 +71,13 @@ fail () {
     exit 1
 }
 
-echo -e "${STEP}  Setting Trap ${NO}"
+echo -e "${DONE}  Setting Trap ${NO}"
 trap "echo; echo \"Unmounting /proc\"; fail" SIGINT SIGTERM
 
 
 # Check to see if Devuan-pi-imager.sh is being run as root
 start_time=$(date)
-echo -e "${STEP}\n  Checking for root .. ${NO}"
+echo -e "${DONE}\n  Checking for root .. ${NO}"
 if [ `id -u` != 0 ]; then
     echo "nop"
     echo -e "Ooops, Devuan-pi-imager.sh needs to be run as root !!\n"
@@ -88,7 +88,7 @@ else
 fi
 
 if [ ! -e debs/Dependencies-ok ]; then
-  echo -e "${STEP}\n  Installing dependencies ..  ${NO}"
+  echo -e "${DONE}\n  Installing dependencies ..  ${NO}"
     apt install dosfstools file kpartx libc6-dev parted psmisc xz-utils || fail
   touch debs/Dependencies-ok
 fi
@@ -118,7 +118,7 @@ if [ ! -f Image ]; then
 fi
 
 # Create partitions
-echo -e "${STEP}\n\n  Creating partitions ${NO}"
+echo -e "${DONE}\n\n  Creating partitions ${NO}"
 fdisk Image <<EOF
 o
 n
@@ -137,19 +137,19 @@ p
 w
 EOF
 
-echo -e "${STEP}\n  Setting up drive mapper ${NO}"
+echo -e "${DONE}\n  Setting up drive mapper ${NO}"
 loop_device=$(losetup --show -f Image) || fail
 
-echo -e "${STEP}    Loop device is ${DONE} $loop_device ${NO}"
-echo -e "${STEP}  Partprobing $loop_device ${NO}"
+echo -e "${DONE}    Loop device is ${DONE} $loop_device ${NO}"
+echo -e "${DONE}  Partprobing $loop_device ${NO}"
 partprobe ${loop_device}
 bootpart=${loop_device}p1
 rootpart=${loop_device}p2
-echo -e "${STEP}    Boot partition is ${DONE} $bootpart ${NO}"
-echo -e "${STEP}    Root partition is ${DONE} $rootpart ${NO}"
+echo -e "${DONE}    Boot partition is ${DONE} $bootpart ${NO}"
+echo -e "${DONE}    Root partition is ${DONE} $rootpart ${NO}"
 
 # Format partitions
-echo -e "${STEP}\n  Formating partitions ${NO}"
+echo -e "${DONE}\n  Formating partitions ${NO}"
 echo "mkfs.vfat -n boot $bootpart"
 mkfs.vfat -n BOOT $bootpart
 echo
@@ -162,17 +162,17 @@ P2_UUID="$(lsblk -o PTUUID "${loop_device}" | sed -n 2p)-02"
 echo "P1_UUID = ${P1_UUID}"
 echo "P2_UUID = ${P2_UUID}"
 
-echo -e "${STEP}\n  Setting up for DeBootStrap ${NO}"
+echo -e "${DONE}\n  Setting up for DeBootStrap ${NO}"
 mkdir -v sdcard
 mount -v -t ext4 -o sync $rootpart sdcard
 
 if [ ! -d debs/${ARCH}/${ReLease} ]; then
-  echo -e "${STEP}\n  Making debs directory ${NO}"
+  echo -e "${DONE}\n  Making debs directory ${NO}"
   mkdir -vp debs/${ARCH}/${ReLease}
 fi
 
 if [ -f debs/${ARCH}/${ReLease}/eudev*.deb ]; then
-  echo -e "${STEP}\n  Copying debs ${NO}"
+  echo -e "${DONE}\n  Copying debs ${NO}"
   du -sh debs/${ARCH}/${ReLease}
   mkdir -vp sdcard/var/cache/apt/archives
   cp debs/${ARCH}/${ReLease}/*.deb sdcard/var/cache/apt/archives
@@ -187,7 +187,7 @@ fi
 
 ##	devuan_keyring
 if [ ! -f "/usr/share/keyrings/devuan-keyring.gpg" ]; then
-	echo -e "${STEP} Installing Devuan keyring"
+	echo -e "${DONE} Installing Devuan keyring"
 	URL="https://pkgmaster.devuan.org/devuan/pool/main/d/devuan-keyring/"
 	FILE="devuan-keyring_2023.10.07_all.deb"
 	wget -nc --show-progress ${URL}${FILE}
@@ -203,12 +203,12 @@ include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfi
 exclude=
 #exclude="--exclude= "
 
-echo -e "${STEP}\n  DeBootStrap's line is ${NO}"
+echo -e "${DONE}\n  DeBootStrap's line is ${NO}"
 DeBootStrapline=" --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard"
 echo ${DeBootStrapline}; echo
 DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard || fail
 
-echo -e "${STEP}\n  Mount new chroot system\n ${NO}"
+echo -e "${DONE}\n  Mount new chroot system\n ${NO}"
 mount -v -t vfat -o sync $bootpart sdcard/boot
 mount -v proc sdcard/proc -t proc
 mount -v sysfs sdcard/sys -t sysfs
@@ -225,10 +225,10 @@ echo -e "${INFO}\n\n  Copy, adjust and reconfigure ${NO}"
 
 ##	################# sources.list  ####################################################################################### 
 echo -e "${WARN}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
-echo -e "${WARN} From: ${STEP}"
+echo -e "${WARN} From: ${DONE}"
 cat sdcard/etc/apt/sources.list
 echo -e "${BOUL} To:"
-sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
+#sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
 #  echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" >> sdcard/etc/apt/sources.list
 #echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" > sdcard/etc/apt/sources.list
 tee -a sdcard/etc/apt/sources.list <<EOF
@@ -249,10 +249,18 @@ EOF
 cat sdcard/etc/apt/sources.list
 echo -e "${NO}"
 
-echo -e "${STEP}\n  Install ${DONE}locales-all\n ${NO}"
-chroot sdcard apt-get install -y locales-all || fail
+chroot sdcard apt update
+chroot sdcard apt upgrade
 
-echo -en "${STEP}\n  Adjusting locales too...  ${NO}"
+	echo -e "${DONE}  apt install -y gnupg wget ${NO}"
+	chroot sdcard apt-get install -y gnupg wget || fail
+
+
+
+echo -e "${DONE}\n  Install ${DONE}locales-all\n ${NO}"
+chroot sdcard apt install -y locales-all || fail
+
+echo -en "${DONE}\n  Adjusting locales too...  ${NO}"
 if [ "$locales" == "" ]; then 
     cp -v /etc/locale.gen sdcard/etc/locale.gen
 else
@@ -260,27 +268,27 @@ else
 fi
 grep -v '^#' sdcard/etc/locale.gen
 
-echo -en "${STEP}\n  Adjusting default local too...  ${NO}"
+echo -en "${DONE}\n  Adjusting default local too...  ${NO}"
 if [ "$default_locale" == "" ]; then 
     default_locale=$(fgrep "=" /etc/default/locale | cut -f 2 -d '=')
 fi
 echo $default_locale
 
-echo -e "${STEP}\n  local-gen  LANG=${default_locale} ${NO}"
+echo -e "${DONE}\n  local-gen  LANG=${default_locale} ${NO}"
 chroot sdcard locale-gen LANG="$default_locale"
 
-echo -e "${STEP}\n  dpkg-reconfigure -f noninteractive locales ${NO}"
+echo -e "${DONE}\n  dpkg-reconfigure -f noninteractive locales ${NO}"
 chroot sdcard dpkg-reconfigure -f noninteractive locales
 
-echo -en "${STEP}  Changing timezone too...   America/New_York  ${NO}"
+echo -en "${DONE}  Changing timezone too...   America/New_York  ${NO}"
 echo "America/New_York" > sdcard/etc/timezone
 rm -v sdcard/etc/localtime
 cat sdcard/etc/timezone
 
-echo -e "${STEP}\n  dpkg-reconfigure -f noninteractive tzdata ${NO}"
+echo -e "${DONE}\n  dpkg-reconfigure -f noninteractive tzdata ${NO}"
 chroot sdcard dpkg-reconfigure -f noninteractive tzdata
 
-echo -e "${STEP}\n  Setting up keyboard ${NO}"
+echo -e "${DONE}\n  Setting up keyboard ${NO}"
 if [ "$number_of_keys" == "" ]; then 
     cp -v /etc/default/keyboard sdcard/etc/default/keyboard
 else
@@ -306,19 +314,19 @@ EOF
 fi
 cat sdcard/etc/default/keyboard
 
-echo -e "${STEP}\n  dpkg-reconfigure -f noninteractive keyboard-configuration ${NO}"
+echo -e "${DONE}\n  dpkg-reconfigure -f noninteractive keyboard-configuration ${NO}"
 chroot sdcard dpkg-reconfigure -f noninteractive keyboard-configuration
 
-echo -e "${STEP}\n  Install ${DONE}consolekit\n ${NO}"
+echo -e "${DONE}\n  Install ${DONE}consolekit\n ${NO}"
 #chroot sdcard apt-get install -y consolekit logind || fail
 
 
 
-echo -e "${STEP}\n  dpkg-reconfigure -f noninteractive console-setup ${NO}"
+echo -e "${DONE}\n  dpkg-reconfigure -f noninteractive console-setup ${NO}"
 chroot sdcard dpkg-reconfigure -f noninteractive console-setup
 
 
-echo -e "${STEP}\n  Setting up networking ${NO}"
+echo -e "${DONE}\n  Setting up networking ${NO}"
 echo $hostname > sdcard/etc/hostname
 echo 'nameserver 8.8.8.8' > sdcard/etc/resolv.conf
 echo 'nameserver 8.8.4.4' >> sdcard/etc/resolv.conf
@@ -333,7 +341,7 @@ ff02::2		ip6-allrouters
 
 EOF
 
-echo -e "${STEP}\n  Create sdcard/etc/network/interfaces ${NO}"
+echo -e "${DONE}\n  Create sdcard/etc/network/interfaces ${NO}"
 tee sdcard/etc/network/interfaces <<EOF
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
@@ -349,12 +357,12 @@ iface eth0 inet dhcp
 EOF
 
 
-echo -e "${STEP}\n  hostname ${NO}"; cat sdcard/etc/hostname
-echo -e "${STEP}\n  resolv.conf ${NO}"; cat sdcard/etc/resolv.conf
-echo -e "${STEP}\n  hosts ${NO}"; cat sdcard/etc/hosts
+echo -e "${DONE}\n  hostname ${NO}"; cat sdcard/etc/hostname
+echo -e "${DONE}\n  resolv.conf ${NO}"; cat sdcard/etc/resolv.conf
+echo -e "${DONE}\n  hosts ${NO}"; cat sdcard/etc/hosts
 
 
-echo -e "${STEP}  Creating fstab ${NO}"
+echo -e "${DONE}  Creating fstab ${NO}"
 cat <<EOF > sdcard/etc/fstab
 #<file system>  <dir>          <type>   <options>       <dump>  <pass>
 proc            /proc           proc    defaults          0       0
@@ -368,7 +376,7 @@ cat sdcard/etc/fstab && sync; echo
 #/dev/mmcblk0p1  /boot           vfat    defaults          0       2
 #/dev/mmcblk0p2  /               ext4    defaults,noatime  0       1
 
-echo -e "${STEP}\n  Setting dphys-swapfile size to 100meg ${NO}"
+echo -e "${DONE}\n  Setting dphys-swapfile size to 100meg ${NO}"
 echo "CONF_SWAPSIZE=100" > sdcard/etc/dphys-swapfile
 
 echo -e "${DONE}\n  Done Coping, adjusting and reconfiguring ${NO}"
@@ -381,10 +389,10 @@ if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
 	#	###########  Install raspberrypi.gpg.key  ################
 
 	echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
-	echo -e "${STEP}  apt install -y gnupg wget ${NO}"
+	echo -e "${DONE}  apt install -y gnupg wget ${NO}"
 	chroot sdcard apt-get install -y gnupg wget || fail
 
-	echo -e "${STEP}\n  Add archive.raspberrypi gpg.key ${NO}"
+	echo -e "${DONE}\n  Add archive.raspberrypi gpg.key ${NO}"
 
 	if [ ! -d debs/raspberrypi.gpg.key ]; then
 		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
@@ -393,7 +401,7 @@ if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
 	chroot sdcard apt-key add raspberrypi.gpg.key
 	rm -v sdcard/raspberrypi.gpg.key
 
-	echo -e "${STEP}\n  Creating raspi.list ${NO}"
+	echo -e "${DONE}\n  Creating raspi.list ${NO}"
 	tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
 
 deb http://archive.raspberrypi.org/debian/ buster main
@@ -401,13 +409,13 @@ deb http://archive.raspberrypi.org/debian/ buster main
 #deb-src http://archive.raspberrypi.org/debian/ buster main
 EOF
 
-	echo -e "${STEP}     apt update  ${NO}"
+	echo -e "${DONE}     apt update  ${NO}"
 	chroot sdcard apt update || fail
 
-	echo -e "${STEP}     apt upgrade  ${NO}"
+	echo -e "${DONE}     apt upgrade  ${NO}"
 	chroot sdcard apt-get upgrade -y || fail
 
-	echo -e "${STEP}\n\n  Install some firmware ${NO}"
+	echo -e "${DONE}\n\n  Install some firmware ${NO}"
 	chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
 		firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek || fail
 
@@ -420,7 +428,7 @@ EOF
 
 	KERNEL=$(ls sdcard/lib/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
 
-	echo -e "${STEP}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
+	echo -e "${DONE}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
 	if [ "${ARCH}" == "arm64" ]; then
 		rm -v sdcard/boot/{bootcode.bin,fixup.dat,fixup_x.dat,fixup_cd.dat,fixup_db.dat}
 		rm -v sdcard/boot/{start.elf,start_x.elf,start_cd.elf,start_db.elf}
@@ -441,12 +449,12 @@ EOF
 		ls sdcard/lib/modules
 	fi
 
-	echo -e "${STEP}\n  Creating cmdline.txt ${NO}"
+	echo -e "${DONE}\n  Creating cmdline.txt ${NO}"
 	tee sdcard/boot/cmdline.txt <<EOF
 console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
 EOF
 
-	echo -e "${STEP}\n  Copy config.txt ${NO}"
+	echo -e "${DONE}\n  Copy config.txt ${NO}"
 	if [ ! -f debs/config.armhf ]; then
 		echo; echo; echo "downloading"; echo
 		wget https://raw.githubusercontent.com/RPi-Distro/pi-gen/master/stage1/00-boot-files/files/config.txt -O debs/config.armhf || fail
@@ -468,11 +476,11 @@ EOF
 	fi
 	cp -v debs/config.${ARCH} sdcard/boot/config.txt
 
-	echo -e "${STEP}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
+	echo -e "${DONE}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
 	echo "i2c-dev" >> sdcard/etc/modules
 	cat sdcard/etc/modules
 
-	echo -e "${STEP}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
+	echo -e "${DONE}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
 	sed -i 's/exit 0/echo ds1307 0x68 > \/sys\/class\/i2c-adapter\/i2c-1\/new_device/' sdcard/etc/rc.local
 	echo "hwclock -s" >> sdcard/etc/rc.local
 	echo "" >> sdcard/etc/rc.local
@@ -480,7 +488,7 @@ EOF
 	echo "" >> sdcard/etc/rc.local
 	cat sdcard/etc/rc.local
 
-	echo -e "${STEP}\n  Adding wifi firmware ${NO}"
+	echo -e "${DONE}\n  Adding wifi firmware ${NO}"
 	if [ ! -f debs/brcmfmac.tar.xz ]; then
 		echo; echo; echo "downloading"; echo
 		mkdir -vp sdcard/lib/firmware/brcm
@@ -493,7 +501,7 @@ EOF
 	fi
 	tar xvf debs/brcmfmac.tar.xz
 
-	echo -e "${STEP}\n  Adding Raspberry Pi tweaks to sysctl.conf ${NO}"
+	echo -e "${DONE}\n  Adding Raspberry Pi tweaks to sysctl.conf ${NO}"
 	echo "" >> sdcard/etc/sysctl.conf
 	echo "# http://www.raspberrypi.org/forums/viewtopic.php?p=104096" >> sdcard/etc/sysctl.conf
 	echo "# rpi tweaks" >> sdcard/etc/sysctl.conf
@@ -511,38 +519,38 @@ EOF
 	#vm.dirty_ratio=50
 
 
-	echo -e "${STEP}\n  apt install -y libraspberrypi-bin ${NO}"
+	echo -e "${DONE}\n  apt install -y libraspberrypi-bin ${NO}"
 	chroot sdcard apt-get install -y libraspberrypi-bin || fail
 
-	echo -e "${STEP}\n  apt install -y libraspberrypi-dev ${NO}"
+	echo -e "${DONE}\n  apt install -y libraspberrypi-dev ${NO}"
 	chroot sdcard apt-get install -y libraspberrypi-dev || fail
 
-	echo -e "${STEP}\n  apt install -y libraspberrypi-doc ${NO}"
+	echo -e "${DONE}\n  apt install -y libraspberrypi-doc ${NO}"
 	chroot sdcard apt-get install -y libraspberrypi-doc || fail
 fi
 
 #	###########  ssh, root passwd && extra's  ################
 
-echo -e "${STEP}\n  Install ${DONE}ssh\n ${NO}"
+echo -e "${DONE}\n  Install ${DONE}ssh\n ${NO}"
 chroot sdcard apt-get install -y ssh --no-install-recommends || fail
 
-echo -e "${STEP}\n  Setting up the root password... ${NO} $root_password "
+echo -e "${DONE}\n  Setting up the root password... ${NO} $root_password "
 echo root:$root_password | chroot sdcard chpasswd
 
-echo -e "${STEP}\n  Allowing root to log into $ReLease with password...  ${NO}"
+echo -e "${DONE}\n  Allowing root to log into $ReLease with password...  ${NO}"
 sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/ssh/sshd_config
 grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
 
 #dhcpcd5  wpasupplicant
 EXTRAS="git mlocate ntp parted psmisc sysv-rc-conf"
-echo -e "${STEP}\n  Install ${DONE}${EXTRAS}\n ${NO}"
+echo -e "${DONE}\n  Install ${DONE}${EXTRAS}\n ${NO}"
 chroot sdcard apt-get install -y ${EXTRAS} || fail
 
 #	###########  Set up User's  ################
 
 echo -e "${DONE}\n  Setup user pi  ${NO}"
-echo -e "${STEP}\n    apt install -y sudo ${NO}"
+echo -e "${DONE}\n    apt install -y sudo ${NO}"
 chroot sdcard apt-get install -y sudo || fail
 echo
 chroot sdcard adduser pi --gecos "${hostname}" --disabled-password
@@ -610,7 +618,7 @@ if [ "$my_DESKTOP" = "yes" ]; then
     echo -e "${DONE}\n    piclone pi-greeter rpi-imager ${NO}"
     chroot sdcard apt-get install -y piclone pi-greeter rpi-imager
 
-    echo -e "${STEP}\n    switching lightdm.conf's autologin-user to ${DONE} pi  ${NO}"
+    echo -e "${DONE}\n    switching lightdm.conf's autologin-user to ${DONE} pi  ${NO}"
     grep autologin-user= sdcard/etc/lightdm/lightdm.conf
     #sed sdcard/etc/lightdm/lightdm.conf -i -e "s/autologin-user=pi/autologin-user=devuan/"
     #grep autologin-user sdcard/etc/lightdm/lightdm.conf
@@ -618,10 +626,10 @@ fi
 
 #	########### Final setup		###########
 
-echo -e "${STEP}\n  sync'n debs ${NO}"
+echo -e "${DONE}\n  sync'n debs ${NO}"
 cp -nv sdcard/var/cache/apt/archives/*.deb debs/${ARCH}/${ReLease}
 
-echo -e "${STEP}\n  Cleaning out archives   ${NO}"
+echo -e "${DONE}\n  Cleaning out archives   ${NO}"
 du -h sdcard/var/cache/apt/archives | tail -1
 rm -rf sdcard/var/cache/apt/archives/*
 rm -v sdcard/*.deb
@@ -637,11 +645,11 @@ cp -aR .git sdcard/root/Devuan-imager/.git
 ls .git sdcard/root/Devuan-imager/.git
 
 sync
-echo -e "${STEP}\n  Total sdcard used ${NO}"; echo
+echo -e "${DONE}\n  Total sdcard used ${NO}"; echo
 #du -h sdcard | tail -1
 du -ch sdcard | grep total
 
-echo -e "${STEP}\n  Unmounting mount points ${NO}"
+echo -e "${DONE}\n  Unmounting mount points ${NO}"
 umount -v sdcard/proc
 umount -v sdcard/sys
 umount -v sdcard/dev/pts
@@ -649,17 +657,17 @@ umount -v sdcard/boot
 umount -v sdcard
 rm -rvf sdcard
 
-echo -e "${STEP}\n  Sanity check on ${rootpart} ${NO}"
+echo -e "${DONE}\n  Sanity check on ${rootpart} ${NO}"
 file -s ${rootpart}
 
-echo -e "${STEP}\n  Listing superblocks of ${rootpart} ${NO}"
+echo -e "${DONE}\n  Listing superblocks of ${rootpart} ${NO}"
 dumpe2fs ${rootpart} | grep -i superblock
 
-echo -e "${STEP}\n  Forced file system check of ${rootpart} ${NO}"
+echo -e "${DONE}\n  Forced file system check of ${rootpart} ${NO}"
 e2fsck -f ${rootpart}
 
-echo -e "${STEP}\n  Resizing filesystem to the minimum size of ${rootpart} ${NO}"
-echo -e "${STEP}    This can take awhile... ${NO}"
+echo -e "${DONE}\n  Resizing filesystem to the minimum size of ${rootpart} ${NO}"
+echo -e "${DONE}    This can take awhile... ${NO}"
 resize2fs -pM ${rootpart}
 
 echo
@@ -667,20 +675,20 @@ fsck.fat -traw ${bootpart}
 echo
 
 
-echo -e "${STEP}\n  Create  ${Image_Name}.gz Image ${NO}"
+echo -e "${DONE}\n  Create  ${Image_Name}.gz Image ${NO}"
 dd if=Image conv=sync,noerror bs=1M | gzip -c > ${Image_Name}.gz
 
-echo -e "${STEP}\n  Create  sha512sum ${NO}"
+echo -e "${DONE}\n  Create  sha512sum ${NO}"
 sha512sum --tag ${Image_Name}.gz > ${Image_Name}.gz.sha512sum
 cat ${Image_Name}.gz.sha512sum
 
-echo -e "${STEP}\n  losetup -d ${loop_device} ${NO}"
+echo -e "${DONE}\n  losetup -d ${loop_device} ${NO}"
 losetup -d ${loop_device}
 
 echo $start_time
 echo $(date)
 echo " "
 
-echo -e "${STEP}\n\n  Okie Dokie, We Done\n ${NO}"
+echo -e "${DONE}\n\n  Okie Dokie, We Done\n ${NO}"
 echo -e "${DONE}  Y'all Have A Great Day now   ${NO}"
 echo
