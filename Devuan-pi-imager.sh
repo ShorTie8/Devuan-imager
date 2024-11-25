@@ -175,7 +175,7 @@ if [ -f debs/${ARCH}/${ReLease}/eudev*.deb ]; then
   echo -e "${STEP}\n  Copying debs ${NO}"
   du -sh debs/${ARCH}/${ReLease}
   mkdir -vp sdcard/var/cache/apt/archives
-  cp -v debs/${ARCH}/${ReLease}/*.deb sdcard/var/cache/apt/archives
+  cp debs/${ARCH}/${ReLease}/*.deb sdcard/var/cache/apt/archives
 fi
 
 if [ ! -d debs/debootstrap ]; then
@@ -223,12 +223,31 @@ mount -v --bind /dev/pts sdcard/dev/pts
 # Adjust a few things
 echo -e "${INFO}\n\n  Copy, adjust and reconfigure ${NO}"
 
+##	################# sources.list  ####################################################################################### 
 echo -e "${WARN}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
+echo -e "${WARN} From: ${STEP}"
 cat sdcard/etc/apt/sources.list
-  sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
+echo -e "${BOUL} To:"
+sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
 #  echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" >> sdcard/etc/apt/sources.list
 #echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" > sdcard/etc/apt/sources.list
+tee -a sdcard/etc/apt/sources.list <<EOF
+
+deb http://deb.devuan.org/merged daedalus main non-free-firmware
+deb-src http://deb.devuan.org/merged daedalus main non-free-firmware
+
+deb http://deb.devuan.org/merged daedalus-security main non-free-firmware
+deb-src http://deb.devuan.org/merged daedalus-security main non-free-firmware
+
+# daedalus-updates, to get updates before a point release is made;
+# see https://www.debian.org/doc/manuals/debian-reference/ch02.en.html#_updates_and_backports
+deb http://deb.devuan.org/merged daedalus-updates main non-free-firmware
+deb-src http://deb.devuan.org/merged daedalus-updates main non-free-firmware
+
+EOF
+
 cat sdcard/etc/apt/sources.list
+echo -e "${NO}"
 
 echo -e "${STEP}\n  Install ${DONE}locales-all\n ${NO}"
 chroot sdcard apt-get install -y locales-all || fail
