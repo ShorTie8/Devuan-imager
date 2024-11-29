@@ -583,6 +583,29 @@ echo -e "${OOPS}################################################################
 echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
 echo -e "${INFO}###########################################################################################################${NO}"
 
+chroot sdcard apt-get install  libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake \
+				bash bc binutils bison busybox bzip2 c-icap libc-icap-mod-contentfiltering \
+				libc-icap-mod-urlcheck libc-icap-mod-virus-scan libcairo2 wodim clamav \
+				coreutils cpio cron libdb5.3 dejagnu isc-dhcp-server dhcpcd dialog diffutils \
+				dnsmasq dosfstools e2fsprogs ethtool udev expat expect file findutils flex fontconfig \
+				fping fonts-freefont-ttf fonts-freefont-otf libfreetype6 gawk gcc libgd3 libgd-tools \
+				gdb libgdbm6 gettext git libglib2.0-0 libc6 libgmp10 gperf grep groff gzip hdparm \
+				apache2 iftop inotify-tools iperf iproute2 ipset iptables iputils-ping joe kbd \
+				klibc-utils kmod less libcap2-bin libcap-ng0 libdumbnet1 libevent-2.1-7 libffi8 \
+				libmnl0 libnet1 libnetfilter-acct1 libnetfilter-conntrack3 libnetfilter-cthelper0 \
+				libnetfilter-cttimeout1 libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libnftnl11 \
+				libosip2-15 libpcap0.8 libpng16-16 libtool libusb-0.1-4 libusb-1.0-0 libxml2 libxslt1.1 \
+				lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd libmpc3 \
+				libmpfr6 mtools nano nasm ncurses-bin libncurses5 libneon27 net-tools libnewt0.52 \
+				libnspr4 libnss3 ntpdate libldap-2.5-0 openntpd openssh-client openssh-server openssl \
+				libreswan libpango-1.0-0 parted patch pciutils pcmciautils libpcre3 perl libpixman-1-0 \
+				pkg-config libpopt0 ppp procinfo procinfo-ng procps psmisc libreadline8 reiserfsprogs \
+				rrdtool rsync screen sed passwd libslang2 smartmontools libsqlite3-0 squid squidguard \
+				strace subversion sudo suricata sysfsutils rsyslog sysvinit tar tcl tcpdump texinfo \
+				unbound usb-modeswitch usbutils util-linux vim wget whois wireless-tools \
+				xtables-addons-common xz-utils libyaml-0-2 zip zlib1g
+
+
 if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
 	wget -O smoothwall-express_4.0pa-1_amd64.deb.gz https://community.smoothwall.org/forum/download/file.php?id=5897
 	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
@@ -591,15 +614,10 @@ else
 	echo "Already gotit"
 fi
 
-#if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
-#	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
-#fi
-
 if [ "$ARCH" = "amd64" ]; then
 		echo "ARCH=amd64"
 		cp -v smoothwall-express_4.0pa-1_amd64.deb sdcard
-		chroot sdcard dpkg -r smoothwall-express_4.0pa-1_amd64
-		#chroot sdcard dpkg -i smoothwall-express_4.0pa-1_amd64.deb
+		chroot sdcard dpkg -i smoothwall-express_4.0pa-1_amd64.deb
 else
 #smoothwall-express_4.0pa-1_amd64.deb.gz
 
