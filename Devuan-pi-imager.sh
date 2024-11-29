@@ -1,30 +1,13 @@
 #!/bin/bash
-# A simple script to make your own Devuan pi4 arm64 image
+# A simple script to make your own Devuan Image
 #
 # BeerWare By ShorTie	<shortie8@verizon.net> 
 
 # Turn off path caching.
 set +h
 
-DATE=$(date +"%Y%m%d")
-ReLease=daedalus
-
-#my_DESKTOP=yes
-
-if [ "$1" = "armhf" ]; then
-    echo "32 bit"
-    ARCH=armhf
-else
-    echo "64 bit"
-    if [ "$1" = "amd64" ]; then
-		ARCH=amd64
-    else
-		ARCH=arm64
-    fi
-fi
-Image_Name=Devuan-${DATE}-${ReLease}.${DATE}.img
-echo ${Image_Name}
-
+Devuan_ReLease=daedalus
+Debian_ReLease=bookworm
 
 # From  http://deb.devuan.org/devuan/pool/main/d/debootstrap
 DeBootStrap=debootstrap_1.0.137devuan1.tar.gz
@@ -107,15 +90,28 @@ kpartx -dv Image
 rm -rvf sdcard
 #rm Image
 
-
 if [ ! -f Image ]; then
-  echo -e "${DONE}\n\n  Creating a zero-filled file ${NO}"
-  if [ "$my_DESKTOP" = "yes" ]; then
-    dd if=/dev/zero of=Image  bs=1M  count=3866 iflag=fullblock
-  else
-    dd if=/dev/zero of=Image  bs=1M  count=1840 iflag=fullblock
-  fi
+	echo -e "${DONE}  Creating Zero filled Image File ${NO}"
+	dd if=/dev/zero of=Image  bs=1M  count=4200 iflag=fullblock
+else
+	echo -e "${DONE}  Zero out, First 420 Puff's of Image File ${NO}"
+	dd if=/dev/zero of=Image  bs=1M  count=420 conv=notrunc status=progress
 fi
+
+DATE=$(date +"%Y%m%d")
+UnameMe=`uname -m`
+
+case ${UnameMe} in
+	armhf)
+		ARCH=armhf ;;
+	aarch64)
+		ARCH=arm64 ;;
+	x86_64)
+		ARCH=amd64 ;;
+  esac
+
+Image_Name=Devuan-${DATE}-${Devuan_ReLease}.${DATE}.img
+echo ${Image_Name}
 
 # Create partitions
 echo -e "${DONE}\n\n  Creating partitions ${NO}"
@@ -148,8 +144,8 @@ rootpart=${loop_device}p2
 echo -e "${DONE}    Boot partition is ${DONE} $bootpart ${NO}"
 echo -e "${DONE}    Root partition is ${DONE} $rootpart ${NO}"
 
-# Format partitions
-echo -e "${DONE}\n  Formating partitions ${NO}"
+# Format Partitions
+echo -e "${DONE}\n  Formating the Partitions ${NO}"
 echo "mkfs.vfat -n boot $bootpart"
 mkfs.vfat -n BOOT $bootpart
 echo
@@ -166,16 +162,16 @@ echo -e "${DONE}\n  Setting up for DeBootStrap ${NO}"
 mkdir -v sdcard
 mount -v -t ext4 -o sync $rootpart sdcard
 
-if [ ! -d debs/${ARCH}/${ReLease} ]; then
+if [ ! -d debs/${ARCH}/${Devuan_ReLease} ]; then
   echo -e "${DONE}\n  Making debs directory ${NO}"
-  mkdir -vp debs/${ARCH}/${ReLease}
+  mkdir -vp debs/${ARCH}/${Devuan_ReLease}
 fi
 
-if [ -f debs/${ARCH}/${ReLease}/eudev*.deb ]; then
+if [ -f debs/${ARCH}/${Devuan_ReLease}/eudev*.deb ]; then
   echo -e "${DONE}\n  Copying debs ${NO}"
-  du -sh debs/${ARCH}/${ReLease}
+  du -sh debs/${ARCH}/${Devuan_ReLease}
   mkdir -vp sdcard/var/cache/apt/archives
-  cp debs/${ARCH}/${ReLease}/*.deb sdcard/var/cache/apt/archives
+  cp debs/${ARCH}/${Devuan_ReLease}/*.deb sdcard/var/cache/apt/archives
 fi
 
 if [ ! -d debs/debootstrap ]; then
@@ -199,14 +195,14 @@ fi
 
 ##	
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
-include="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
+include="--include=apt-utils,kbd,locales,locales-all,gnupg,wget,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
 exclude=
 #exclude="--exclude= "
 
 echo -e "${DONE}\n  DeBootStrap's line is ${NO}"
-DeBootStrapline=" --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard"
+DeBootStrapline=" --arch ${ARCH} ${include} ${exclude} ${Devuan_ReLease} sdcard"
 echo ${DeBootStrapline}; echo
-DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${ReLease} sdcard || fail
+DEBOOTSTRAP_DIR=debs/debootstrap/source debs/debootstrap/source/debootstrap --arch ${ARCH} ${include} ${exclude} ${Devuan_ReLease} sdcard || fail
 
 echo -e "${DONE}\n  Mount new chroot system\n ${NO}"
 mount -v -t vfat -o sync $bootpart sdcard/boot
@@ -225,14 +221,10 @@ echo -e "${INFO}\n\n  Copy, adjust and reconfigure ${NO}"
 
 ##	################# sources.list  ####################################################################################### 
 echo -e "${WARN}\n  Adjusting /etc/apt/sources.list from/too... ${NO}"
-echo -e "${WARN} From: ${DONE}"
+echo -en "${WARN} From: ${DONE}"
 cat sdcard/etc/apt/sources.list
 echo -e "${BOUL} To:"
-#sed -i sdcard/etc/apt/sources.list -e "s/main/main contrib non-free/"
-#  echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" >> sdcard/etc/apt/sources.list
-#echo "deb http://deb.devuan.org/merged ${ReLease} main contrib non-free" > sdcard/etc/apt/sources.list
-tee -a sdcard/etc/apt/sources.list <<EOF
-
+tee sdcard/etc/apt/sources.list <<EOF
 deb http://deb.devuan.org/merged daedalus main non-free-firmware
 deb-src http://deb.devuan.org/merged daedalus main non-free-firmware
 
@@ -245,20 +237,38 @@ deb http://deb.devuan.org/merged daedalus-updates main non-free-firmware
 deb-src http://deb.devuan.org/merged daedalus-updates main non-free-firmware
 
 EOF
-
-cat sdcard/etc/apt/sources.list
 echo -e "${NO}"
 
+if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
+	#	###########  Install raspberrypi.gpg.key  ################
+
+	echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
+	echo -e "${DONE}\n  Add archive.raspberrypi gpg.key ${NO}"
+
+	if [ ! -d debs/raspberrypi.gpg.key ]; then
+		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
+	fi
+	cp -v debs/raspberrypi.gpg.key sdcard
+	#ls /usr/share/keyrings/
+	chroot sdcard apt-key add raspberrypi.gpg.key
+	#chroot sdcard curl -sS http://archive.raspberrypi.org/debian/raspberrypi.gpg.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/raspberrypi.gpg || fail
+
+	#rm -v sdcard/raspberrypi.gpg.key
+
+	echo -e "${DONE}\n  Creating raspi.list ${NO}"
+	tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
+
+deb http://archive.raspberrypi.org/debian/ ${Debian_ReLease} main
+# Uncomment line below then 'apt-get update' to enable 'apt-get source'
+#deb-src http://archive.raspberrypi.org/debian/ buster main
+EOF
+
+	mv -vf sdcard/etc/apt/trusted.gpg sdcard/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg || fail
+
+fi
+
 chroot sdcard apt update
-chroot sdcard apt upgrade
-
-	echo -e "${DONE}  apt install -y gnupg wget ${NO}"
-	chroot sdcard apt-get install -y gnupg wget || fail
-
-
-
-echo -e "${DONE}\n  Install ${DONE}locales-all\n ${NO}"
-chroot sdcard apt install -y locales-all || fail
+chroot sdcard apt upgrade -y
 
 echo -en "${DONE}\n  Adjusting locales too...  ${NO}"
 if [ "$locales" == "" ]; then 
@@ -317,7 +327,7 @@ cat sdcard/etc/default/keyboard
 echo -e "${DONE}\n  dpkg-reconfigure -f noninteractive keyboard-configuration ${NO}"
 chroot sdcard dpkg-reconfigure -f noninteractive keyboard-configuration
 
-echo -e "${DONE}\n  Install ${DONE}consolekit\n ${NO}"
+#echo -e "${DONE}\n  Install ${DONE}consolekit\n ${NO}"
 #chroot sdcard apt-get install -y consolekit logind || fail
 
 
@@ -380,72 +390,71 @@ echo -e "${DONE}\n  Setting dphys-swapfile size to 100meg ${NO}"
 echo "CONF_SWAPSIZE=100" > sdcard/etc/dphys-swapfile
 
 echo -e "${DONE}\n  Done Coping, adjusting and reconfiguring ${NO}"
+
+
+echo -e "${DONE}  Done with basic system ${NO}"
 #	###########  Done with basic system  ################
+
+echo -e "${OOPS}#######################################################################################################################${NO}"
+echo -e "${DONE}###########  Done with Basic System  ##################################################################################${NO}"
+echo -e "${INFO}#######################################################################################################################${NO}"
+
 
 ##	#######################################################################################################################
 ##	###########  pi Stuff  ################################################################################################
 ##	#######################################################################################################################
 if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
-	#	###########  Install raspberrypi.gpg.key  ################
-
-	echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
-	echo -e "${DONE}  apt install -y gnupg wget ${NO}"
-	chroot sdcard apt-get install -y gnupg wget || fail
-
-	echo -e "${DONE}\n  Add archive.raspberrypi gpg.key ${NO}"
-
-	if [ ! -d debs/raspberrypi.gpg.key ]; then
-		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
-	fi
-	cp -v debs/raspberrypi.gpg.key sdcard
-	chroot sdcard apt-key add raspberrypi.gpg.key
-	rm -v sdcard/raspberrypi.gpg.key
-
-	echo -e "${DONE}\n  Creating raspi.list ${NO}"
-	tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
-
-deb http://archive.raspberrypi.org/debian/ buster main
-# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-#deb-src http://archive.raspberrypi.org/debian/ buster main
-EOF
-
 	echo -e "${DONE}     apt update  ${NO}"
 	chroot sdcard apt update || fail
 
 	echo -e "${DONE}     apt upgrade  ${NO}"
 	chroot sdcard apt-get upgrade -y || fail
 
-	echo -e "${DONE}\n\n  Install some firmware ${NO}"
-	chroot sdcard apt-get install firmware-atheros firmware-brcm80211 \
-		firmware-libertas firmware-linux-free firmware-misc-nonfree firmware-realtek || fail
-
-
 	##	###########  Install Kernel  ##########################################################################################
-
 	echo -e "${WARN}\n    Install kernel   ${NO}"
+	##		 https://github.com/raspberrypi/firmware/archive/refs/heads/master.zip
+	wget -nc https://github.com/raspberrypi/firmware/archive/refs/heads/master.zip -O debs/Raspi_FirmWare.tar.gz
+	pv debs/Raspi_FirmWare.tar.gz | tar -zxpf - --xattrs-include='*.*' -C sdcard/tmp || fail
+	KERNEL=$(ls sdcard/tmp/firmware-master/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
+	echo -e "${DONE}    KERNEL ${DONE} ${KERNEL}  ${NO}"
+	echo "boot"
+	cp -r sdcard/tmp/firmware-master/boot/* sdcard/boot
+	echo "${KERNEL}-v8+"
+	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8+ sdcard/lib/modules
+#	echo "${KERNEL}-v8-16k+"
+#	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8-16k+ sdcard/lib/modules
+	
+	#	chroot sdcard apt-get -y install raspi-firmware raspberrypi-kernel || fail
+	#chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
 
-	chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
-
-	KERNEL=$(ls sdcard/lib/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
+	echo; echo " ls boot"
+	ls sdcard/boot
+	echo; echo " ls lib/modules"
+	ls sdcard/lib/modules
+	echo
 
 	echo -e "${DONE}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
-	if [ "${ARCH}" == "arm64" ]; then
+	if [ "${ARCH}" == "aarm64" ]; then
 		rm -v sdcard/boot/{bootcode.bin,fixup.dat,fixup_x.dat,fixup_cd.dat,fixup_db.dat}
 		rm -v sdcard/boot/{start.elf,start_x.elf,start_cd.elf,start_db.elf}
 		rm -v sdcard/boot/{kernel.img,kernel7.img,kernel7l.img}
 		rm -v sdcard/boot/{bcm2708-rpi-cm.dtb,bcm2708-rpi-b.dtb,bcm2708-rpi-b-rev1.dtb,bcm2708-rpi-b-plus.dtb}
 		rm -v sdcard/boot/{bcm2708-rpi-zero.dtb,bcm2708-rpi-zero-w.dtb,bcm2709-rpi-2-b.dtb}
 		rm -v sdcard/boot/{bcm2710-rpi-2-b.dtb,bcm2710-rpi-cm3.dtb,bcm2710-rpi-3-b.dtb,bcm2710-rpi-3-b-plus.dtb}
+		echo -e "${DONE}From:${INFO}"
 		ls sdcard/lib/modules
+		echo -e "${DONE}"
 		rm -rf sdcard/lib/modules/{${KERNEL}+,${KERNEL}-v7+,${KERNEL}-v7l+}
+		echo -e "${DONE}To:${INFO}"
 		ls sdcard/lib/modules
+		echo -e "{NO}"
 	else
 	#   rm -v sdcard/boot/{fixup4.dat,fixup4x.dat,fixup4cd.dat,fixup4db.dat}
 	#   rm -v sdcard/boot/{start4.elf,start4x.elf,start4cd.elf,start4db.elf}
-		rm -v sdcard/boot/kernel8.img
+	#	rm -v sdcard/boot/kernel8.img
 	#   rm -v sdcard/boot/bcm2711-rpi-4-b.dtb
-		ls sdcard/lib/modules
-		rm -rf sdcard/lib/modules/${KERNEL}-v8+
+	#	ls sdcard/lib/modules
+	#	rm -rf sdcard/lib/modules/${KERNEL}-v8+
 		ls sdcard/lib/modules
 	fi
 
@@ -475,18 +484,6 @@ EOF
 		sed -i 's/#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' debs/config.arm64
 	fi
 	cp -v debs/config.${ARCH} sdcard/boot/config.txt
-
-	echo -e "${DONE}\n  Add i2c-dev >> sdcard/etc/modules  ${NO}"
-	echo "i2c-dev" >> sdcard/etc/modules
-	cat sdcard/etc/modules
-
-	echo -e "${DONE}\n  Add ds1307 0x68 too sdcard/etc/rc.local  ${NO}"
-	sed -i 's/exit 0/echo ds1307 0x68 > \/sys\/class\/i2c-adapter\/i2c-1\/new_device/' sdcard/etc/rc.local
-	echo "hwclock -s" >> sdcard/etc/rc.local
-	echo "" >> sdcard/etc/rc.local
-	echo "exit 0" >> sdcard/etc/rc.local
-	echo "" >> sdcard/etc/rc.local
-	cat sdcard/etc/rc.local
 
 	echo -e "${DONE}\n  Adding wifi firmware ${NO}"
 	if [ ! -f debs/brcmfmac.tar.xz ]; then
@@ -519,14 +516,20 @@ EOF
 	#vm.dirty_ratio=50
 
 
-	echo -e "${DONE}\n  apt install -y libraspberrypi-bin ${NO}"
-	chroot sdcard apt-get install -y libraspberrypi-bin || fail
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-bin ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-bin || fail
 
-	echo -e "${DONE}\n  apt install -y libraspberrypi-dev ${NO}"
-	chroot sdcard apt-get install -y libraspberrypi-dev || fail
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-dev ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-dev || fail
 
-	echo -e "${DONE}\n  apt install -y libraspberrypi-doc ${NO}"
-	chroot sdcard apt-get install -y libraspberrypi-doc || fail
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-doc ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-doc || fail
+
+##	#######################################################################################################################
+##	###########  End pi Stuff  ############################################################################################
+##	#######################################################################################################################
+
+
 fi
 
 #	###########  ssh, root passwd && extra's  ################
@@ -537,22 +540,14 @@ chroot sdcard apt-get install -y ssh --no-install-recommends || fail
 echo -e "${DONE}\n  Setting up the root password... ${NO} $root_password "
 echo root:$root_password | chroot sdcard chpasswd
 
-echo -e "${DONE}\n  Allowing root to log into $ReLease with password...  ${NO}"
+echo -e "${DONE}\n  Allowing root to log into $Devuan_ReLease with password...  ${NO}"
 sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/ssh/sshd_config
 grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
 cp -v bashrc.root sdcard/root/.bashrc
 
-#dhcpcd5  wpasupplicant
-EXTRAS="git mlocate ntp parted psmisc sysv-rc-conf"
-echo -e "${DONE}\n  Install ${DONE}${EXTRAS}\n ${NO}"
-chroot sdcard apt-get install -y ${EXTRAS} || fail
-
 #	###########  Set up User's  ################
 
 echo -e "${DONE}\n  Setup user pi  ${NO}"
-echo -e "${DONE}\n    apt install -y sudo ${NO}"
-chroot sdcard apt-get install -y sudo || fail
-echo
 chroot sdcard adduser pi --gecos "${hostname}" --disabled-password
 echo pi:toor | chroot sdcard chpasswd
 
@@ -560,11 +555,19 @@ chroot sdcard groupadd spi
 chroot sdcard groupadd i2c
 chroot sdcard groupadd gpio
 
+chroot sdcard adduser pi adm
+chroot sdcard adduser pi dialout
+chroot sdcard adduser pi cdrom
 chroot sdcard adduser pi sudo
 chroot sdcard adduser pi audio
-chroot sdcard adduser pi dialout
 chroot sdcard adduser pi video
+chroot sdcard adduser pi plugdev
+chroot sdcard adduser pi games
+chroot sdcard adduser pi users
+chroot sdcard adduser pi input
 chroot sdcard adduser pi disk
+chroot sdcard adduser pi render
+chroot sdcard adduser pi lpadmin
 chroot sdcard adduser pi spi
 chroot sdcard adduser pi i2c
 chroot sdcard adduser pi gpio
@@ -572,62 +575,43 @@ chroot sdcard adduser pi netdev
 
 cp -v bashrc.root sdcard/home/pi/.bashrc
 
-#	###########  Install Desktop  ################
-
-if [ "$DESKTOP" = "yes" ]; then
-    echo -e "${DONE}\n  Install Desktop ${NO}"
-    chroot sdcard apt-get install -y gufw xterm lxappearance lxrandr lxpolkit openbox obconf obmenu openbox-menu menu tint2 nitrogen featherpad vlc audacious \
-		ceni alsa-utils alsa-tools-gui slim pcmanfm chromium lxqt-sudo orage sylpheed sylpheed-i18n sylpheed-plugins hexchat zenity xautolock
-    chroot sdcard apt-get install -y xserver-xorg-core xserver-xorg-input-libinput xserver-xorg-input-kbd xserver-xorg-input-mouse xserver-xorg-input-evdev \
-		cinnabar-icon-theme desktop-base base-files
-    install -v -m 0644 -D menu.xml sdcard/home/devuan/.config/openbox/menu.xml
-    install -v -m 0644 rc.xml sdcard/home/devuan/.config/openbox/rc.xml
-fi
-
-
-if [ "$my_DESKTOP" = "yes" ]; then
-    echo -e "${DONE}\n  Install my_Desktop ${NO}"
-
-    echo -e "${DONE}\n    gstreamer1.0-x ${NO}"
-    chroot sdcard apt-get install -y gstreamer1.0-x \
-		gstreamer1.0-omx gstreamer1.0-plugins-base \
-		gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-		gstreamer1.0-alsa gstreamer1.0-libav qpdfview gtk2-engines
-
-    echo -e "${DONE}\n    alsa-utils ${NO}"
-    chroot sdcard apt-get install -y alsa-utils \
-		desktop-base raspberrypi-artwork policykit-1 gvfs rfkill
-
-    echo -e "${DONE}\n    xinit xserver-xorg ${NO}"
-    chroot sdcard apt-get install -y xinit xserver-xorg \
-		xserver-xorg-video-fbdev xserver-xorg-video-fbturbo
-
-    if [ "${ARCH}" == "armhf" ]; then
-        echo -e "${DONE}\n    lxde  ${NO}"
-        chroot sdcard apt-get install -y lxde
-    else
-        echo -e "${DONE}\n    lxde   --no-install-recommends ${NO}"
-        chroot sdcard apt-get install -y lxde  --no-install-recommends
-    fi
-
-    echo -e "${DONE}\n    mousepad lxtask menu-xdg ${NO}"
-    chroot sdcard apt-get install -y mousepad lxtask menu-xdg \
-		zenity xdg-utils gvfs-backends gvfs-fuse lightdm \
-		gnome-themes-standard gnome-icon-theme
-
-    echo -e "${DONE}\n    piclone pi-greeter rpi-imager ${NO}"
-    chroot sdcard apt-get install -y piclone pi-greeter rpi-imager
-
-    echo -e "${DONE}\n    switching lightdm.conf's autologin-user to ${DONE} pi  ${NO}"
-    grep autologin-user= sdcard/etc/lightdm/lightdm.conf
-    #sed sdcard/etc/lightdm/lightdm.conf -i -e "s/autologin-user=pi/autologin-user=devuan/"
-    #grep autologin-user sdcard/etc/lightdm/lightdm.conf
-fi
-
 #	########### Final setup		###########
 
+## SmoothWall
+
+echo -e "${OOPS}###########################################################################################################${NO}"
+echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
+echo -e "${INFO}###########################################################################################################${NO}"
+
+if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
+	wget -O smoothwall-express_4.0pa-1_amd64.deb.gz https://community.smoothwall.org/forum/download/file.php?id=5897
+	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
+	rm -v  smoothwall-express_4.0pa-1_amd64.deb.gz
+else
+	echo "Already gotit"
+fi
+
+#if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
+#	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
+#fi
+
+if [ "$ARCH" = "amd64" ]; then
+		echo "ARCH=amd64"
+		cp -v smoothwall-express_4.0pa-1_amd64.deb sdcard
+		chroot sdcard dpkg -r smoothwall-express_4.0pa-1_amd64
+		#chroot sdcard dpkg -i smoothwall-express_4.0pa-1_amd64.deb
+else
+#smoothwall-express_4.0pa-1_amd64.deb.gz
+
+	if [ ! -f "temp/lookit/data.tar.xz" ]; then
+		mkdir lookit; cd lookit
+		ar x ../smoothwall-express_4.0pa-1_amd64.deb
+	fi
+	pv temp/lookit/data.tar.xz | tar -Jxpf - --xattrs-include='*.*' -C sdcard || fail
+fi
+
 echo -e "${DONE}\n  sync'n debs ${NO}"
-cp -nv sdcard/var/cache/apt/archives/*.deb debs/${ARCH}/${ReLease}
+cp -nv sdcard/var/cache/apt/archives/*.deb debs/${ARCH}/${Devuan_ReLease}
 
 echo -e "${DONE}\n  Cleaning out archives   ${NO}"
 du -h sdcard/var/cache/apt/archives | tail -1
