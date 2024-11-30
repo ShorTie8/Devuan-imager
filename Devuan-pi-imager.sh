@@ -195,7 +195,7 @@ fi
 
 ##	
 # These are added to debootstrap now so no setup Dialog boxes are done, configuration done later.
-include="--include=apt-utils,kbd,locales,locales-all,gnupg,wget,keyboard-configuration,console-setup,dphys-swapfile,devuan-keyring"
+include="--include=apt-utils,kbd,locales,locales-all,gnupg,wget,keyboard-configuration,console-setup,dphys-swapfile,miniupnpd,devuan-keyring"
 exclude=
 #exclude="--exclude= "
 
@@ -366,11 +366,9 @@ iface eth0 inet dhcp
 
 EOF
 
-
 echo -e "${DONE}\n  hostname ${NO}"; cat sdcard/etc/hostname
 echo -e "${DONE}\n  resolv.conf ${NO}"; cat sdcard/etc/resolv.conf
 echo -e "${DONE}\n  hosts ${NO}"; cat sdcard/etc/hosts
-
 
 echo -e "${DONE}  Creating fstab ${NO}"
 cat <<EOF > sdcard/etc/fstab
@@ -389,16 +387,9 @@ cat sdcard/etc/fstab && sync; echo
 echo -e "${DONE}\n  Setting dphys-swapfile size to 100meg ${NO}"
 echo "CONF_SWAPSIZE=100" > sdcard/etc/dphys-swapfile
 
-echo -e "${DONE}\n  Done Coping, adjusting and reconfiguring ${NO}"
-
-
-echo -e "${DONE}  Done with basic system ${NO}"
-#	###########  Done with basic system  ################
-
 echo -e "${OOPS}#######################################################################################################################${NO}"
 echo -e "${DONE}###########  Done with Basic System  ##################################################################################${NO}"
 echo -e "${INFO}#######################################################################################################################${NO}"
-
 
 ##	#######################################################################################################################
 ##	###########  pi Stuff  ################################################################################################
@@ -496,7 +487,7 @@ EOF
 		wget -nc -P sdcard/lib/firmware/brcm https://raw.githubusercontent.com/RPi-Distro/firmware-nonfree/master/brcm/brcmfmac43455-sdio.txt || fail
 		tar -cJf debs/brcmfmac.tar.xz sdcard/lib/firmware/brcm/*
 	fi
-	tar xvf debs/brcmfmac.tar.xz
+	tar xf debs/brcmfmac.tar.xz
 
 	echo -e "${DONE}\n  Adding Raspberry Pi tweaks to sysctl.conf ${NO}"
 	echo "" >> sdcard/etc/sysctl.conf
@@ -583,7 +574,8 @@ echo -e "${OOPS}################################################################
 echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
 echo -e "${INFO}###########################################################################################################${NO}"
 
-chroot sdcard apt-get install  libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake \
+echo -e "${DONE}  Some Depend's ${NO}"
+chroot sdcard apt-get install -y libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake \
 				bash bc binutils bison busybox bzip2 c-icap libc-icap-mod-contentfiltering \
 				libc-icap-mod-urlcheck libc-icap-mod-virus-scan libcairo2 wodim clamav \
 				coreutils cpio cron libdb5.3 dejagnu isc-dhcp-server dhcpcd dialog diffutils \
@@ -595,16 +587,22 @@ chroot sdcard apt-get install  libgeoip1 python3 acpica-tools apcupsd at attr au
 				libmnl0 libnet1 libnetfilter-acct1 libnetfilter-conntrack3 libnetfilter-cthelper0 \
 				libnetfilter-cttimeout1 libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libnftnl11 \
 				libosip2-15 libpcap0.8 libpng16-16 libtool libusb-0.1-4 libusb-1.0-0 libxml2 libxslt1.1 \
-				lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd libmpc3 \
+				lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd-nftables libmpc3 \
 				libmpfr6 mtools nano nasm ncurses-bin libncurses5 libneon27 net-tools libnewt0.52 \
 				libnspr4 libnss3 ntpdate libldap-2.5-0 openntpd openssh-client openssh-server openssl \
 				libreswan libpango-1.0-0 parted patch pciutils pcmciautils libpcre3 perl libpixman-1-0 \
 				pkg-config libpopt0 ppp procinfo procinfo-ng procps psmisc libreadline8 reiserfsprogs \
 				rrdtool rsync screen sed passwd libslang2 smartmontools libsqlite3-0 squid squidguard \
 				strace subversion sudo suricata sysfsutils rsyslog sysvinit tar tcl tcpdump texinfo \
-				unbound usb-modeswitch usbutils util-linux vim wget whois wireless-tools \
-				xtables-addons-common xz-utils libyaml-0-2 zip zlib1g
+				unbound usb-modeswitch usbutils util-linux uuid-runtime vim wget whois wireless-tools \
+				xtables-addons-common xz-utils libyaml-0-2 zip zlib1g || fail
 
+echo -e "${DONE} miniupnpd ${NO}"
+chroot sdcard apt-get install -y miniupnpd
+
+echo -e "${OOPS}###########################################################################################################${NO}"
+echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
+echo -e "${INFO}###########################################################################################################${NO}"
 
 if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
 	wget -O smoothwall-express_4.0pa-1_amd64.deb.gz https://community.smoothwall.org/forum/download/file.php?id=5897
