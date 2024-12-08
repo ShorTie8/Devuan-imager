@@ -1,0 +1,4 @@
+[submodule "smoothwall-express/smoothwall-express/smoothwall-git"]
+	path = smoothwall-express/smoothwall-express/smoothwall-git
+	url = https://github.com/ShorTie8/Devuan-imager.git
+	branch = remotes/origin/fest3er-swe3.1-update12
