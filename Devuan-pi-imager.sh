@@ -25,8 +25,6 @@ keyboard_variant=		# blank is normal
 keyboard_options=		# blank is normal
 backspace=guess			# guess is normal
 
-PI=Yuppers
-
 #************************************************************************
 
 # Define message colors
@@ -241,44 +239,36 @@ deb-src http://deb.devuan.org/merged daedalus-updates main non-free-firmware
 EOF
 echo -e "${NO}"
 
-if [ "$PI" = "Yuppers" ] && [ "$ARCH" = "arm64" ]; then
+if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
 	#	###########  Install raspberrypi.gpg.key  ################
+
 	echo -e "${DONE}\n    Install raspberrypi.gpg.key   ${NO}"
-	if [ ! -f debs/raspberrypi-archive-keyring_2016.10.31_all.deb ]; then
-		wget -nc https://archive.raspberrypi.org/debian/pool/main/r/raspberrypi-archive-keyring/raspberrypi-archive-keyring_2016.10.31_all.deb -O debs/raspberrypi-archive-keyring_2016.10.31_all.deb
+	echo -e "${DONE}\n  Add archive.raspberrypi gpg.key ${NO}"
+
+	if [ ! -d debs/raspberrypi.gpg.key ]; then
+		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
 	fi
-	cp -v  debs/raspberrypi-archive-keyring_2016.10.31_all.deb sdcard/
-	chroot sdcard dpkg -i raspberrypi-archive-keyring_2016.10.31_all.deb
-	rm -v sdcard/raspberrypi-archive-keyring_2016.10.31_all.deb
-	
+	cp -v debs/raspberrypi.gpg.key sdcard
+	#ls /usr/share/keyrings/
+	chroot sdcard apt-key add raspberrypi.gpg.key
+	#chroot sdcard curl -sS http://archive.raspberrypi.org/debian/raspberrypi.gpg.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/raspberrypi.gpg || fail
+
+	#rm -v sdcard/raspberrypi.gpg.key
+
 	echo -e "${DONE}\n  Creating raspi.list ${NO}"
 	tee sdcard/etc/apt/sources.list.d/raspi.list <<EOF
+
 deb http://archive.raspberrypi.org/debian/ ${Debian_ReLease} main
 # Uncomment line below then 'apt-get update' to enable 'apt-get source'
 #deb-src http://archive.raspberrypi.org/debian/ buster main
 EOF
 
+	mv -vf sdcard/etc/apt/trusted.gpg sdcard/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg || fail
+
 fi
 
-	chroot sdcard apt update
-	chroot sdcard apt upgrade -y
-
-	
-	##	raspberrypi-archive-keyring
-#	chroot sdcard apt-get install -y raspberrypi-archive-keyring || fail
-#	echo -e "${DONE}\n  Add archive.raspberrypi gpg.key ${NO}"
-
-#	if [ ! -d debs/raspberrypi.gpg.key ]; then
-#		wget -nc -P debs http://archive.raspberrypi.org/debian/raspberrypi.gpg.key || fail
-#	fi
-#	cp -v debs/raspberrypi.gpg.key sdcard
-#	#ls /usr/share/keyrings/
-#	chroot sdcard apt-key add raspberrypi.gpg.key
-#	#chroot sdcard curl -sS http://archive.raspberrypi.org/debian/raspberrypi.gpg.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/raspberrypi.gpg || fail
-
-#	#rm -v sdcard/raspberrypi.gpg.key
-#	mv -vf sdcard/etc/apt/trusted.gpg sdcard/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg || fail
-
+chroot sdcard apt update
+chroot sdcard apt upgrade -y
 
 echo -en "${DONE}\n  Adjusting locales too...  ${NO}"
 if [ "$locales" == "" ]; then 
@@ -397,79 +387,33 @@ cat sdcard/etc/fstab && sync; echo
 echo -e "${DONE}\n  Setting dphys-swapfile size to 100meg ${NO}"
 echo "CONF_SWAPSIZE=100" > sdcard/etc/dphys-swapfile
 
-#	###########  Set up User's  ################
-
-echo -e "${DONE}\n  Setup user pi  ${NO}"
-chroot sdcard adduser pi --gecos "${hostname}" --disabled-password
-echo pi:toor | chroot sdcard chpasswd
-
-chroot sdcard groupadd spi
-chroot sdcard groupadd i2c
-chroot sdcard groupadd gpio
-
-chroot sdcard adduser pi adm
-chroot sdcard adduser pi dialout
-chroot sdcard adduser pi cdrom
-chroot sdcard adduser pi sudo
-chroot sdcard adduser pi audio
-chroot sdcard adduser pi video
-chroot sdcard adduser pi plugdev
-chroot sdcard adduser pi games
-chroot sdcard adduser pi users
-chroot sdcard adduser pi input
-chroot sdcard adduser pi disk
-chroot sdcard adduser pi render
-chroot sdcard adduser pi lpadmin
-chroot sdcard adduser pi spi
-chroot sdcard adduser pi i2c
-chroot sdcard adduser pi gpio
-chroot sdcard adduser pi netdev
-
 echo -e "${OOPS}#######################################################################################################################${NO}"
 echo -e "${DONE}###########  Done with Basic System  ##################################################################################${NO}"
 echo -e "${INFO}#######################################################################################################################${NO}"
 
+##	#######################################################################################################################
+##	###########  pi Stuff  ################################################################################################
+##	#######################################################################################################################
+if [ "$ARCH" = "armhf" ] || [ "$ARCH" = "arm64" ]; then
+	echo -e "${DONE}     apt update  ${NO}"
+	chroot sdcard apt update || fail
 
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  More basic Stuff  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-chroot sdcard apt-get install -y binutils firmware-linux firmware-linux-free firmware-linux-nonfree firmware-realtek initramfs-tools \
-		libpython3.11-minimal ntp python3 python3-tk python3-venv python3.11-venv python3-tk-dbg tcl8.6 tk8.6 tcl-tclreadline rsyslog wget zip zlib1g
-
-
-#echo -e "${OOPS}###########################################################################################################${NO}"
-#echo -e "${DONE}###########  apt-cache search rasp  #####################################################################################${NO}"
-#echo -e "${INFO}###########################################################################################################${NO}"
-#echo; echo
-#chroot sdcard apt-cache search rasp
-
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  linux-image for ${ARCH}  ########################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-
-
-if [ "${PI}" = "Yuppers" ]; then
-	chroot sdcard apt-get install -y firmware-realtek || fail
-	#chroot sdcard apt-get install -y raspi-firmware
-#	chroot sdcard apt-get install -y linux-image-rpi-v8 firmware-realtek || fail
+	echo -e "${DONE}     apt upgrade  ${NO}"
+	chroot sdcard apt-get upgrade -y || fail
 
 	##	###########  Install Kernel  ##########################################################################################
 	echo -e "${WARN}\n    Install kernel   ${NO}"
-	if [ ! -f "debs/Raspi_FirmWare.tar.gz" ]; then
-		wget -nc https://github.com/raspberrypi/firmware/archive/refs/heads/master.zip -O debs/Raspi_FirmWare.tar.gz
-	fi
+	##		 https://github.com/raspberrypi/firmware/archive/refs/heads/master.zip
+	wget -nc https://github.com/raspberrypi/firmware/archive/refs/heads/master.zip -O debs/Raspi_FirmWare.tar.gz
 	pv debs/Raspi_FirmWare.tar.gz | tar -zxpf - --xattrs-include='*.*' -C sdcard/tmp || fail
 	KERNEL=$(ls sdcard/tmp/firmware-master/modules | grep v8+ | cut -d"-" -f1 | awk '{print$1}')
 	echo -e "${DONE}    KERNEL ${DONE} ${KERNEL}  ${NO}"
 	echo "boot"
 	cp -r sdcard/tmp/firmware-master/boot/* sdcard/boot
 	echo "${KERNEL}-v8+"
-	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8+/* sdcard/lib/modules
-	echo "${KERNEL}-v8-16k+"
-	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8-16k+ sdcard/lib/modules
+	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8+ sdcard/lib/modules
+#	echo "${KERNEL}-v8-16k+"
+#	cp -r sdcard/tmp/firmware-master/modules/${KERNEL}-v8-16k+ sdcard/lib/modules
 	
 	#	chroot sdcard apt-get -y install raspi-firmware raspberrypi-kernel || fail
 	#chroot sdcard apt-get -y install raspberrypi-bootloader raspberrypi-kernel || fail
@@ -481,15 +425,7 @@ if [ "${PI}" = "Yuppers" ]; then
 	echo
 
 	echo -e "${DONE}\n    Crud Removal  ${DONE} ${KERNEL}  ${NO}"
-	if [ "${ARCH}" = "armhf" ]; then
-		rm -v sdcard/boot/{fixup4.dat,fixup4x.dat,fixup4cd.dat,fixup4db.dat}
-		rm -v sdcard/boot/{start4.elf,start4x.elf,start4cd.elf,start4db.elf}
-		rm -v sdcard/boot/kernel8.img
-		rm -v sdcard/boot/bcm2711-rpi-4-b.dtb
-		ls sdcard/lib/modules
-		rm -rf sdcard/lib/modules/${KERNEL}-v8+
-		ls sdcard/lib/modules
-	elif [ "${ARCH}" = "arm64" ]; then
+	if [ "${ARCH}" == "aarm64" ]; then
 		rm -v sdcard/boot/{bootcode.bin,fixup.dat,fixup_x.dat,fixup_cd.dat,fixup_db.dat}
 		rm -v sdcard/boot/{start.elf,start_x.elf,start_cd.elf,start_db.elf}
 		rm -v sdcard/boot/{kernel.img,kernel7.img,kernel7l.img}
@@ -502,205 +438,20 @@ if [ "${PI}" = "Yuppers" ]; then
 		rm -rf sdcard/lib/modules/{${KERNEL}+,${KERNEL}-v7+,${KERNEL}-v7l+}
 		echo -e "${DONE}To:${INFO}"
 		ls sdcard/lib/modules
-		echo -e "${NO}"
+		echo -e "{NO}"
 	else
-		echo "UnKnum ARCH ${ARCH}"
+	#   rm -v sdcard/boot/{fixup4.dat,fixup4x.dat,fixup4cd.dat,fixup4db.dat}
+	#   rm -v sdcard/boot/{start4.elf,start4x.elf,start4cd.elf,start4db.elf}
+	#	rm -v sdcard/boot/kernel8.img
+	#   rm -v sdcard/boot/bcm2711-rpi-4-b.dtb
+	#	ls sdcard/lib/modules
+	#	rm -rf sdcard/lib/modules/${KERNEL}-v8+
+		ls sdcard/lib/modules
 	fi
 
-
-
-
-
-
-
-	echo; echo " ls lib/modules"
-	ls sdcard/boot
-	ls sdcard/lib/modules
-
-
-
-elif [ "${ARCH}" = "amd64" ]; then
-	chroot sdcard apt-get install -y linux-image-${ARCH} intel-microcode amd64-microcode
-else
-	echo "UnKnum ARCH ${ARCH}"
-	exit 1
-fi
-
-
-#
-# W: Couldn't identify type of root file system for fsck hook
-
-#The following additional packages will be installed:
-#  apparmor busybox firmware-linux-free initramfs-tools initramfs-tools-core klibc-utils libklibc linux-base linux-image-6.1.0-28-arm64 zstd
-#Suggested packages:
-#  apparmor-profiles-extra apparmor-utils bash-completion linux-doc-6.1 debian-kernel-handbook
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  apache2  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-#chroot sdcard apt-get install -y apache2
-
-
-
-#	###########  ssh, root passwd && extra's  ################
-
-echo -e "${DONE}\n  Install ${DONE}ssh\n ${NO}"
-chroot sdcard apt-get install -y ssh --no-install-recommends || fail
-
-echo -e "${DONE}\n  Setting up the root password... ${NO} $root_password "
-echo root:$root_password | chroot sdcard chpasswd
-
-echo -e "${DONE}\n  Allowing root to log into $Devuan_ReLease with password...  ${NO}"
-sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/ssh/sshd_config
-grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
-cp -v bashrc.root sdcard/root/.bashrc
-
-
-
-cp -v bashrc.root sdcard/home/pi/.bashrc
-
-#	########### Final setup		###########
-
-## SmoothWall
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  apache2  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-#chroot sdcard apt-get install -s apache2
-
-
-
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  grub2-common  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-#chroot sdcard apt-get install -s grub2-common
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  libreswan  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-#chroot sdcard apt-get install -s libreswan
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  clamav  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-#chroot sdcard apt-get install -s clamav
-##	The following additional packages will be installed:
-##	  ca-certificates clamav-base clamav-freshclam libbrotli1 libclamav11 libcurl4 libicu72 libjson-c5 libmspack0 libnghttp2-14 librtmp1 libssh2-1 libxml2 openssl
-##	Suggested packages:
-##  libclamunrar clamav-docs apparmor libclamunrar11
-
-#echo; echo
-#Pre-Depends="libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake bash bc binutils bison busybox bzip2 c-icap libc-icap-mod-contentfiltering libc-icap-mod-urlcheck libc-icap-mod-virus-scan libcairo2 wodim clamav coreutils cpio cron libdb5.3 dejagnu isc-dhcp-server dhcpcd dialog diffutils dnsmasq dosfstools e2fsprogs ethtool udev expat expect file findutils flex fontconfig fping fonts-freefont-ttf fonts-freefont-otf libfreetype6 gawk gcc libgd3 libgd-tools gdb libgdbm6 gettext git libglib2.0-0 libc6 libgmp10 gperf grep groff gzip hdparm apache2 iftop inotify-tools iperf iproute2 ipset iptables iputils-ping joe kbd klibc-utils kmod less libcap2-bin libcap-ng0 libdumbnet1 libevent-2.1-7 libffi8 libmnl0 libnet1 libnetfilter-acct1 libnetfilter-conntrack3 libnetfilter-cthelper0 libnetfilter-cttimeout1 libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libnftnl11 libosip2-15 libpcap0.8 libpng16-16 libtool libusb-0.1-4 libusb-1.0-0 libxml2 libxslt1.1 lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd libmpc3 libmpfr6 mtools nano nasm ncurses-bin libncurses5 libneon27 net-tools libnewt0.52 libnspr4 libnss3 ntpdate libldap-2.5-0 openntpd openssh-client openssh-server openssl libreswan libpango-1.0-0 parted patch pciutils pcmciautils libpcre3 perl libpixman-1-0 pkg-config libpopt0 ppp procinfo procinfo-ng procps psmisc libreadline8 reiserfsprogs rrdtool rsync screen sed passwd libslang2 smartmontools libsqlite3-0 squid squidguard strace subversion sudo suricata sysfsutils rsyslog sysvinit tar tcl tcpdump texinfo unbound usb-modeswitch usbutils util-linux vim wget whois wireless-tools xtables-addons-common xz-utils libyaml-0-2 zip zlib1g"
-#chroot sdcard apt-get install -s ${Pre-Depends}
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  linux-headers-${ARCH}  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-echo; echo
-
-#chroot sdcard apt-get install -s linux-headers-${ARCH} || fail
-
-##	raspberrypi-kernel-headers
-
-
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  build-dep  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-
-#chroot sdcard apt-get build-dep -s clamav
-##chroot sdcard apt-get build-dep -s snort
-#chroot sdcard apt-get build-dep -s libreswan
-#chroot sdcard apt-get build-dep -s miniupnpd
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  Depends  #####################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-
-ls sdcard/lib/modules
-
-
-
-echo -e "${DONE}  Some Depend's ${NO}"
-DePends="libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake \
-				bash bc binutils bison busybox bzip2 c-icap libc-icap-mod-contentfiltering \
-				libc-icap-mod-urlcheck libc-icap-mod-virus-scan libcairo2 wodim clamav \
-				coreutils cpio cron libdb5.3 dejagnu isc-dhcp-server dhcpcd dialog diffutils \
-				dnsmasq dosfstools e2fsprogs ethtool udev expat expect file findutils flex fontconfig \
-				fping fonts-freefont-ttf fonts-freefont-otf libfreetype6 gawk gcc libgd3 libgd-tools \
-				gdb libgdbm6 gettext git libglib2.0-0 libc6 libgmp10 gperf grep groff gzip hdparm \
-				apache2 iftop inotify-tools iperf iproute2 ipset iptables iputils-ping joe kbd \
-				klibc-utils kmod less libcap2-bin libcap-ng0 libdumbnet1 libevent-2.1-7 libffi8 \
-				libmnl0 libnet1 libnetfilter-acct1 libnetfilter-conntrack3 libnetfilter-cthelper0 \
-				libnetfilter-cttimeout1 libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libnftnl11 \
-				libosip2-15 libpcap0.8 libpng16-16 libtool libusb-0.1-4 libusb-1.0-0 libxml2 libxslt1.1 \
-				lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd-nftables libmpc3 \
-				libmpfr6 mtools nano nasm ncurses-bin libncurses5 libneon27 net-tools libnewt0.52 \
-				libnspr4 libnss3 ntpdate libldap-2.5-0 openntpd openssh-client openssh-server openssl \
-				libpango-1.0-0 parted patch pciutils pcmciautils libpcre3 perl libpixman-1-0 \
-				pkg-config libpopt0 ppp procinfo procinfo-ng procps psmisc libreadline8 reiserfsprogs \
-				rrdtool rsync screen sed passwd libslang2 smartmontools libsqlite3-0 squid squidguard \
-				strace subversion sudo suricata sysfsutils rsyslog sysvinit tar tcl tcpdump texinfo \
-				unbound usb-modeswitch usbutils util-linux uuid-runtime vim wget whois wireless-tools \
-				xtables-addons-common xz-utils libyaml-0-2 zip zlib1g"
-# chroot sdcard apt-get install -s ${DePends} || fail
-
-ls sdcard/lib/modules
-
-echo -e "${DONE} miniupnpd ${NO}"
-chroot sdcard apt-get install -y miniupnpd
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  End Depends  #################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-
-echo -e "${OOPS}###########################################################################################################${NO}"
-echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
-echo -e "${INFO}###########################################################################################################${NO}"
-
-if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
-	wget -O smoothwall-express_4.0pa-1_amd64.deb.gz https://community.smoothwall.org/forum/download/file.php?id=5897
-	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
-	rm -v  smoothwall-express_4.0pa-1_amd64.deb.gz
-else
-	echo "Already gotit"
-fi
-
-if [ "$ARCH" = "amd64" ]; then
-		echo "ARCH=amd64"
-		cp -v smoothwall-express_4.0pa-1_amd64.deb sdcard
-		chroot sdcard dpkg -i smoothwall-express_4.0pa-1_amd64.deb
-else
-#smoothwall-express_4.0pa-1_amd64.deb.gz
-
-	if [ ! -f "temp/lookit/data.tar.xz" ]; then
-		mkdir lookit; cd lookit
-		ar x ../smoothwall-express_4.0pa-1_amd64.deb
-	fi
-	pv temp/lookit/data.tar.xz | tar -Jxpf - --xattrs-include='*.*' -C sdcard || fail
-fi
-
-
-
-
-
-if [ "$PI" = "Yuppers" ]; then
-echo -e "${OOPS}#######################################################################################################################${NO}"
-echo -e "${DONE}########### ${WARN} pi Stuff  ${DONE}################################################################################################${NO}"
-echo -e "${STEP}#######################################################################################################################${NO}"
 	echo -e "${DONE}\n  Creating cmdline.txt ${NO}"
 	tee sdcard/boot/cmdline.txt <<EOF
-console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
+console=serial0,115200 console=tty1 root=PARTUUID=${P2_UUID} rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
 EOF
 
 	echo -e "${DONE}\n  Copy config.txt ${NO}"
@@ -754,9 +505,125 @@ EOF
 	#vm.swappiness=100
 	#vm.dirty_background_ratio=1
 	#vm.dirty_ratio=50
-echo -e "${INFO}#######################################################################################################################${NO}"
-echo -e "${OOPS}###########  End pi Stuff  ############################################################################################${NO}"
-echo -e "${DONE}#######################################################################################################################${NO}"
+
+
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-bin ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-bin || fail
+
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-dev ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-dev || fail
+
+#	echo -e "${DONE}\n  apt install -y libraspberrypi-doc ${NO}"
+#	chroot sdcard apt-get install -y libraspberrypi-doc || fail
+
+##	#######################################################################################################################
+##	###########  End pi Stuff  ############################################################################################
+##	#######################################################################################################################
+
+
+fi
+
+#	###########  ssh, root passwd && extra's  ################
+
+echo -e "${DONE}\n  Install ${DONE}ssh\n ${NO}"
+chroot sdcard apt-get install -y ssh --no-install-recommends || fail
+
+echo -e "${DONE}\n  Setting up the root password... ${NO} $root_password "
+echo root:$root_password | chroot sdcard chpasswd
+
+echo -e "${DONE}\n  Allowing root to log into $Devuan_ReLease with password...  ${NO}"
+sed -i 's/.*PermitRootLogin prohibit-password/PermitRootLogin yes/' sdcard/etc/ssh/sshd_config
+grep 'PermitRootLogin' sdcard/etc/ssh/sshd_config
+cp -v bashrc.root sdcard/root/.bashrc
+
+#	###########  Set up User's  ################
+
+echo -e "${DONE}\n  Setup user pi  ${NO}"
+chroot sdcard adduser pi --gecos "${hostname}" --disabled-password
+echo pi:toor | chroot sdcard chpasswd
+
+chroot sdcard groupadd spi
+chroot sdcard groupadd i2c
+chroot sdcard groupadd gpio
+
+chroot sdcard adduser pi adm
+chroot sdcard adduser pi dialout
+chroot sdcard adduser pi cdrom
+chroot sdcard adduser pi sudo
+chroot sdcard adduser pi audio
+chroot sdcard adduser pi video
+chroot sdcard adduser pi plugdev
+chroot sdcard adduser pi games
+chroot sdcard adduser pi users
+chroot sdcard adduser pi input
+chroot sdcard adduser pi disk
+chroot sdcard adduser pi render
+chroot sdcard adduser pi lpadmin
+chroot sdcard adduser pi spi
+chroot sdcard adduser pi i2c
+chroot sdcard adduser pi gpio
+chroot sdcard adduser pi netdev
+
+cp -v bashrc.root sdcard/home/pi/.bashrc
+
+#	########### Final setup		###########
+
+## SmoothWall
+
+echo -e "${OOPS}###########################################################################################################${NO}"
+echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
+echo -e "${INFO}###########################################################################################################${NO}"
+
+echo -e "${DONE}  Some Depend's ${NO}"
+chroot sdcard apt-get install -y libgeoip1 python3 acpica-tools apcupsd at attr autoconf automake \
+				bash bc binutils bison busybox bzip2 c-icap libc-icap-mod-contentfiltering \
+				libc-icap-mod-urlcheck libc-icap-mod-virus-scan libcairo2 wodim clamav \
+				coreutils cpio cron libdb5.3 dejagnu isc-dhcp-server dhcpcd dialog diffutils \
+				dnsmasq dosfstools e2fsprogs ethtool udev expat expect file findutils flex fontconfig \
+				fping fonts-freefont-ttf fonts-freefont-otf libfreetype6 gawk gcc libgd3 libgd-tools \
+				gdb libgdbm6 gettext git libglib2.0-0 libc6 libgmp10 gperf grep groff gzip hdparm \
+				apache2 iftop inotify-tools iperf iproute2 ipset iptables iputils-ping joe kbd \
+				klibc-utils kmod less libcap2-bin libcap-ng0 libdumbnet1 libevent-2.1-7 libffi8 \
+				libmnl0 libnet1 libnetfilter-acct1 libnetfilter-conntrack3 libnetfilter-cthelper0 \
+				libnetfilter-cttimeout1 libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libnftnl11 \
+				libosip2-15 libpcap0.8 libpng16-16 libtool libusb-0.1-4 libusb-1.0-0 libxml2 libxslt1.1 \
+				lm-sensors logrotate lynx m4 make python3-mako man-db manpages mdadm miniupnpd-nftables libmpc3 \
+				libmpfr6 mtools nano nasm ncurses-bin libncurses5 libneon27 net-tools libnewt0.52 \
+				libnspr4 libnss3 ntpdate libldap-2.5-0 openntpd openssh-client openssh-server openssl \
+				libreswan libpango-1.0-0 parted patch pciutils pcmciautils libpcre3 perl libpixman-1-0 \
+				pkg-config libpopt0 ppp procinfo procinfo-ng procps psmisc libreadline8 reiserfsprogs \
+				rrdtool rsync screen sed passwd libslang2 smartmontools libsqlite3-0 squid squidguard \
+				strace subversion sudo suricata sysfsutils rsyslog sysvinit tar tcl tcpdump texinfo \
+				unbound usb-modeswitch usbutils util-linux uuid-runtime vim wget whois wireless-tools \
+				xtables-addons-common xz-utils libyaml-0-2 zip zlib1g || fail
+
+echo -e "${DONE} miniupnpd ${NO}"
+chroot sdcard apt-get install -y miniupnpd
+
+echo -e "${OOPS}###########################################################################################################${NO}"
+echo -e "${DONE}###########  SmoothWall  ##################################################################################${NO}"
+echo -e "${INFO}###########################################################################################################${NO}"
+
+if [ ! -f "smoothwall-express_4.0pa-1_amd64.deb" ]; then
+	wget -O smoothwall-express_4.0pa-1_amd64.deb.gz https://community.smoothwall.org/forum/download/file.php?id=5897
+	gunzip smoothwall-express_4.0pa-1_amd64.deb.gz
+	rm -v  smoothwall-express_4.0pa-1_amd64.deb.gz
+else
+	echo "Already gotit"
+fi
+
+if [ "$ARCH" = "amd64" ]; then
+		echo "ARCH=amd64"
+		cp -v smoothwall-express_4.0pa-1_amd64.deb sdcard
+		chroot sdcard dpkg -i smoothwall-express_4.0pa-1_amd64.deb
+else
+#smoothwall-express_4.0pa-1_amd64.deb.gz
+
+	if [ ! -f "temp/lookit/data.tar.xz" ]; then
+		mkdir lookit; cd lookit
+		ar x ../smoothwall-express_4.0pa-1_amd64.deb
+	fi
+	pv temp/lookit/data.tar.xz | tar -Jxpf - --xattrs-include='*.*' -C sdcard || fail
 fi
 
 echo -e "${DONE}\n  sync'n debs ${NO}"
